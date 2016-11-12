@@ -86,7 +86,7 @@ read FAKE
 #i=$(echo $raw|sed 's/\.pcap//')	#obviously, if the ext of your PCAP not
 									# '.pcap', modify
 #The below would need to be further revised, as I updated since. will probably
-# be dopped, w/o frame numbers it's not so useful...
+# be dropped, w/o frame numbers it's not so useful...
 #This line sorts the uri's alphabetically, if you uncomment two lines
 #  1 + prolongation
 #tshark -o "ssl.keylog_file: $2" -q -r $i.pcap -T fields \

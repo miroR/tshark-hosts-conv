@@ -70,7 +70,7 @@ read FAKE
 echo \$ext: $ext
 
 function ask()	# this function borrowed from Advanced BASH Scripting Guide
-				# by Mandel Cooper (IIRC)
+				# by Mendel Cooper (IIRC)
 {
     echo -n "$@" '[y/n] ' ; read ans
     case "$ans" in
