@@ -250,6 +250,7 @@ paste con-ip_column_1 con-ip_column_3 | grep -Ev \
 	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//' \
 	| sed 's/81.2.237.32\t//' | sed 's/\t81.2.237.32//'
 fi
+read FAKE
 
 echo "---";
 echo "Saving the listing of non-local IPs from the trace to:"
