@@ -49,21 +49,25 @@ do
     esac
 done
 
+echo
+echo "########################################################################"
+echo "I'm not really a programmer. I'm writing these scripts out of sheer need."
+echo "They are currently, and that state may last for longer, in a poor user's"
+echo "debugging state. which means lots of "read FAKE" lines that wait for me"
+echo "to keel comparing the lines in the script to what they do, while they do"
+echo "their work... Patience, please!"
+echo "########################################################################"
+echo
 echo \$SSLKEYLOGFILE: $SSLKEYLOGFILE
 if [ "$KEYLOGFILE" == "" ]; then
 	KEYLOGFILE=$SSLKEYLOGFILE
 fi
 echo \$KEYLOGFILE: $KEYLOGFILE
-#read FAKE
-
 echo \$PCAP_FILE: $PCAP_FILE
-#read FAKE
 dump=$(echo $PCAP_FILE|cut -d. -f1)
 echo \$dump: $dump
-#read FAKE
 ext=$(echo $PCAP_FILE|cut -d. -f2)
 echo \$ext: $ext
-#read FAKE
 filename=$dump.$ext
 echo \$filename: $filename
 read FAKE
@@ -79,22 +83,59 @@ function ask()	# this function borrowed from Advanced BASH Scripting Guide
     esac
 }
 
-#raw=$1
 #dump=$(echo $raw|sed 's/\.pcap//')	#obviously, if the ext of your PCAP not
 #								# '.pcap', modify. I don't bother with old
 #								# .pcap (I came to network reading later),
 #								# rather I rename all new .pcapng to .pcap
 
 # Often it's logins and passwords that are of interest in traces, and typically
-# they live in POST'ed data
-tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -V -Y \
+# they live in POST'ed data. So this is the first thing I'll do.
+
+echo "tshark ... $dump.$ext -qz hosts started in background..."
+echo "tshark ... $dump.$ext -qz conv,ip started in background..."
+echo
+echo "You should wait until these are listed (with 'ls -l') when done:"
+echo 
+echo "$dump.hosts"
+echo "$dump.conv-ip"
+echo
+echo "The script has not been programmed to wait, but your (the human) decision"
+echo "to wait here for them to be created, and then get a useable listing"
+echo "of conversations by non-local IPs"
+echo 
+tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz hosts \
+	>  $dump.hosts && ls -l $dump.hosts &
+tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz conv,ip \
+	>  $dump.conv-ip \
+	&& ls -l $dump.conv-ip &
+if [ -s "$dump.hosts" ]; then
+	ls -l $dump.hosts ;
+else
+	echo "At the time this if statement ran, these:"
+	echo "$dump.hosts and $dump.conv-ip"
+	echo "were (still) empty files."
+fi
+
+sleep 5 && tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -V -Y \
 	'http.request.method==POST'\
 	> $dump.POST && ls -l $dump.POST  &
-echo "-Y http.request.method==POST started in background..."
+sleep 5 && echo "-Y http.request.method==POST started in background..."
+sleep 5 && echo
+
+sleep 5 && \
+if [ -s "$dump.POST" ]; then
+	ls -l $dump.POST ;
+else
+	echo "At the time this if statement ran, the:"
+	echo "$dump.POST"
+	echo "was (still) an empty file."
+	echo "You should wait until it is listed (with 'ls -l') done."
+fi
+sleep 5 && echo
 
 # Examining $dump.POST in a session where you logged in somewhere, gets you the
 # frame.number's and tcp.stream's that contain the POST'ed data, and with which
-# IP the conversation with the login was.
+# IP the conversation at the login was.
 #
 # Not all can be done from this terminal. You need to view and analyze the
 # files that will be created in the process, such as $dump.POST, in another
@@ -114,7 +155,8 @@ echo "-Y http.request.method==POST started in background..."
 # from
 # https://github.com/miroR/tshark-streams
 # )
-# , look up the conversation with that IP more closely.
+# , [and after one more section] look up the conversation with that IP more
+# closely.
 #
 
 echo "Run tshark-http-uri.sh on the whole trace?"
@@ -127,6 +169,7 @@ if [ "$?" == 0 ]; then
 	echo -n "1 for do filtering, 0 for none: "
 	read do_filtering
 	while [ "$do_filtering" == "1" ]; do
+		echo
 		echo "Give filter (e.g. \"http.cookie\" or \"frame.number==NNN\")"
 		echo -n "to run on $dump.${ext} : "
 		read the_filter
@@ -149,23 +192,6 @@ if [ "$?" == 0 ]; then
 	done
 fi
 
-tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz hosts \
-	>  $dump.hosts && ls -l $dump.hosts &
-	echo "-qz hosts started in background..."
-tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz conv,ip \
-	>  $dump.conv-ip \
-	&& ls -l $dump.conv-ip &
-	echo "-qz conv,ip started in background..."
-
-echo 
-echo "(Possibly) wait (non-auto, human decision-wait) for these:"
-echo 
-echo "$dump.hosts"
-echo "$dump.conv-ip"
-echo 
-echo "to be created, and then get a useable listing"
-echo "of conversations by non-local IPs"
-echo 
 echo \$dump.conv-ip: $dump.conv-ip
 # This is a fake read. It only waits for you to hit Enter to go on, or hit
 # Ctrl-C and bail out.
@@ -200,15 +226,17 @@ cat $dump.conv-ip | head -$raw_lines_sans_btm | tail -$clean_lines \
 
 # I'm not really a programmer... If you want to use this script for yourself,
 # get your own listing of local IP's and substitute them for the ones below (I
-# have the Chinese ZTE ZXDSL 531VII (IIRC) censor-ready router, used, as far as
+# have the Chinese ZTE ZXDSL 931VII censor-ready router, used, as far as
 # Europe, in mainly former-Communist countries, I never see my temp public IP
-# in my traces, but connect to the internet via router's local 192.168.1.4/24
-# that it assigns to me):
+# in my traces, but connect to the internet via router's local, say,
+# 192.168.1.4/24 or some other of the range 192.168.1.0/24 that it assigns to
+# me):
 
 # Good to be able to skip this for huge traces, and go straight to saving the
 # listing
 echo "List the non-local-hosts one per line ?"
-echo "A huge trace? Don't reply \"y\", would go two loops not one."
+echo "A huge trace (and the machine not poweful)?"
+echo "If you don't reply \"y\", you will have one loop less to go."
 ask;
 if [ "$?" == 0 ]; then
 echo "---";
@@ -218,7 +246,9 @@ paste con-ip_column_1 con-ip_column_3 | grep -Ev \
 	'0\.0\.0\.0|224\.0\.0\.1|255\.255\.255\.255|127\.0\.0\.1' \
 	| sed 's/192.168.1.1\t//' | sed 's/\t192.168.1.1//' \
 	| sed 's/192.168.1.2\t//' | sed 's/\t192.168.1.2//' \
-	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//'
+	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//' \
+# the below is OpenDNS that I use, also best exempted from analysis (or?):
+	| sed 's/81.2.237.32\t//' | sed 's/\t81.2.237.32//'
 fi
 
 echo "---";
@@ -231,6 +261,8 @@ paste con-ip_column_1 con-ip_column_3 | grep -Ev \
 	| sed 's/192.168.1.1\t//' | sed 's/\t192.168.1.1//' \
 	| sed 's/192.168.1.2\t//' | sed 's/\t192.168.1.2//' \
 	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//' \
+# the below is OpenDNS that I use, also best exempted from analysis (or?):
+	| sed 's/81.2.237.32\t//' | sed 's/\t81.2.237.32//'	\
 	> $dump.non-local-hosts-ls-1
 
 echo "This will be the first run, so you get some measure on the"
