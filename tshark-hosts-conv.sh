@@ -249,7 +249,7 @@ paste con-ip_column_1 con-ip_column_3 | grep -Ev \
 	| sed 's/192.168.1.2\t//' | sed 's/\t192.168.1.2//' \
 	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//' \
 	| sed 's/81.2.237.32\t//' | sed 's/\t81.2.237.32//' \
-	| grep -E '[[:print:]]'
+	| sed 's/81.2.237.32//' | grep -E '[[:print:]]'
 fi
 read FAKE
 
@@ -265,7 +265,7 @@ paste con-ip_column_1 con-ip_column_3 | grep -Ev \
 	| sed 's/192.168.1.2\t//' | sed 's/\t192.168.1.2//' \
 	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//' \
 	| sed 's/81.2.237.32\t//' | sed 's/\t81.2.237.32//'	\
-	| grep -E '[[:print:]]' \
+	| sed 's/81.2.237.32//' | grep -E '[[:print:]]' \
 	> $dump.non-local-hosts-ls-1
 
 echo "This will be the first run, so you get some measure on the"
