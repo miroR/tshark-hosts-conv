@@ -54,7 +54,7 @@ echo "########################################################################"
 echo "I'm not really a programmer. I'm writing these scripts out of sheer need."
 echo "They are currently, and that state may last for longer, in a poor user's"
 echo "debugging state. which means lots of "read FAKE" lines that wait for me"
-echo "to keel comparing the lines in the script to what they do, while they do"
+echo "to keep comparing the lines in the script to what they do, while they do"
 echo "their work... Patience, please!"
 echo "########################################################################"
 echo
@@ -242,12 +242,12 @@ if [ "$?" == 0 ]; then
 echo "---";
 echo "This is a listing of non-local IPs"
 echo "---";
+# the below contains also OpenDNS that I use, also best exempted from analysis (or?):
 paste con-ip_column_1 con-ip_column_3 | grep -Ev \
 	'0\.0\.0\.0|224\.0\.0\.1|255\.255\.255\.255|127\.0\.0\.1' \
 	| sed 's/192.168.1.1\t//' | sed 's/\t192.168.1.1//' \
 	| sed 's/192.168.1.2\t//' | sed 's/\t192.168.1.2//' \
 	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//' \
-# the below is OpenDNS that I use, also best exempted from analysis (or?):
 	| sed 's/81.2.237.32\t//' | sed 's/\t81.2.237.32//'
 fi
 
@@ -256,12 +256,12 @@ echo "Saving the listing of non-local IPs from the trace to:"
 echo "    $dump.non-local-hosts-ls-1"
 echo "(takes time for huge traces)"
 echo "---";
+# the below contains also OpenDNS that I use, also best exempted from analysis (or?):
 paste con-ip_column_1 con-ip_column_3 | grep -Ev \
 	'0\.0\.0\.0|224\.0\.0\.1|255\.255\.255\.255|127\.0\.0\.1' \
 	| sed 's/192.168.1.1\t//' | sed 's/\t192.168.1.1//' \
 	| sed 's/192.168.1.2\t//' | sed 's/\t192.168.1.2//' \
 	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//' \
-# the below is OpenDNS that I use, also best exempted from analysis (or?):
 	| sed 's/81.2.237.32\t//' | sed 's/\t81.2.237.32//'	\
 	> $dump.non-local-hosts-ls-1
 
