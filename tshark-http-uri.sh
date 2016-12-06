@@ -41,42 +41,42 @@ do
         exit 0
         ;;
     r)  PCAP_FILE=$OPTARG
-		echo "gives: -r $PCAP_FILE (\$PCAP_FILE); since \$OPTARG: $OPTARG"
+		#echo "gives: -r $PCAP_FILE (\$PCAP_FILE); since \$OPTARG: $OPTARG"
 		#read FAKE
         ;;
     k)  KEYLOGFILE=$OPTARG
-		echo "gives: -k $KEYLOGFILE (\$KEYLOGFILE); since \$OPTARG: $OPTARG"
+		#echo "gives: -k $KEYLOGFILE (\$KEYLOGFILE); since \$OPTARG: $OPTARG"
 		#read FAKE
         ;;
     esac
 done
 
-echo \$SSLKEYLOGFILE: $SSLKEYLOGFILE
+#echo \$SSLKEYLOGFILE: $SSLKEYLOGFILE
 if [ "$KEYLOGFILE" == "" ]; then
 	KEYLOGFILE=$SSLKEYLOGFILE
 fi
-echo \$KEYLOGFILE: $KEYLOGFILE
+#echo \$KEYLOGFILE: $KEYLOGFILE
 #read FAKE
 
-echo -n \$PCAP_FILE: $PCAP_FILE
+#echo -n \$PCAP_FILE: $PCAP_FILE
 #read FAKE
 # Files can have a few dots, this is how I'll take the last as separator.
 num_dots=$(echo $PCAP_FILE|sed 's/\./\n/g'| wc -l)
 num_dots_min_1=$(echo $num_dots - 1 | bc)
-echo \$num_dots: $num_dots
-echo \$num_dots_min_1: $num_dots_min_1
+#echo \$num_dots: $num_dots
+#echo \$num_dots_min_1: $num_dots_min_1
 ext=$(echo $PCAP_FILE|cut -d. -f $num_dots)
-echo \$ext: $ext
+#echo \$ext: $ext
 #read FAKE
-echo $PCAP_FILE|sed "s/\(.*\)\.$ext/\1/"
+#echo $PCAP_FILE|sed "s/\(.*\)\.$ext/\1/"
 dump=$(echo $PCAP_FILE|sed "s/\(.*\)\.$ext/\1/")
-echo \$dump: $dump
+#echo \$dump: $dump
 #read FAKE
 filename=$dump.$ext
-echo \$filename: $filename
+#echo \$filename: $filename
 #read FAKE
-echo \$ext: $ext
-read FAKE
+#echo \$ext: $ext
+#read FAKE
 
 # If your SSLKEYLOGFIE is all set with the SSL keys for the PCAP, don't give a
 # second argument, but if maybe it is a PCAP not taken by your system, then get
