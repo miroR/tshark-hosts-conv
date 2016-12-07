@@ -50,6 +50,7 @@
 
 function show_help {
   echo "tshark-hosts-conv.sh - analyze network traces with Tshark and Bash"
+  echo "version 0.98"
   echo "Usage: $0 -r <PCAP file> -k <ssl.keylog_file>"
   echo ""
   echo -e "    -r \$PCAP_FILE is mandatory (but may not do it alone); see below"
