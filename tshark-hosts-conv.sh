@@ -153,13 +153,22 @@ sleep 3
 echo
 echo "and you might find it useful for further analysis/discussion/other later."
 
-function ask()	# this function borrowed from Advanced BASH Scripting Guide
-				# by Mendel Cooper
+function ask()	# this function borrowed from "Advanced BASH Scripting Guide"
+				# (a free book) by Mendel Cooper
 {
     echo -n "$@" '[y/n] ' ; read ans
     case "$ans" in
         y*|Y*) return 0 ;;
         *) return 1 ;;
+    esac
+}
+
+function decline()	# the opposite, reverse, the negative if you will, of ask()
+{
+    echo -n "$@" '[y/n] ' ; read ans
+    case "$ans" in
+        n*|N*) return 1 ;;
+        *) return 0 ;;
     esac
 }
 
@@ -216,9 +225,9 @@ fi
 # Often it's logins and passwords that are of interest in traces, and typically
 # they live in POST'ed data. So this is the next thing I'll do.
 sleep 4 && echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r $dump.$ext -V -Y \
-	'http.request.method==POST' | sed 's/\t//g' | sed 's/  / /g' \
+	'http.request.method==POST'" | sed 's/\t//g' | sed 's/  / /g' \
 	| sed 's/  / /g' | sed 's/  / /g' \
-	> $dump.POST" |& tee -a $tHostsConvLog &
+	> $dump.POST |& tee -a $tHostsConvLog &
 sleep 5 && tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -V -Y \
 	'http.request.method==POST' | sed 's/\t//g' | sed 's/  / /g' \
 	| sed 's/  / /g' | sed 's/  / /g' \
@@ -269,9 +278,11 @@ sleep 5 && echo &
 # closely.
 #
 
-sleep 3 && echo "Run tshark-http-uri.sh on the whole trace?"
-ask;
+sleep 3 && echo "_Not_ run tshark-http-uri.sh on the whole trace? (Enter == accept)"
+ask
 if [ "$?" == 0 ]; then
+	echo "We skipped running tshark-http-uri.sh on $dump.$ext"
+else
 	echo "tshark-http-uri.sh -k $KEYLOGFILE -r $dump.$ext"  \
 		| sed 's/\t/ /g' | sed 's/  / /g' \
 		| sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog
@@ -279,125 +290,158 @@ if [ "$?" == 0 ]; then
 	ls -l ${dump}-frame-http-request-full_uri.txt >> $tHostsConvLog
 	echo |& tee -a $tHostsConvLog
 fi
+echo
+echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+echo "                   || || || "
+echo "                   || || || "
+echo "                   \/ \/ \/ "
+echo
+echo "The default is to run the commands, so that mere"
+echo "hitting Enter gets things done, without too much fuss."
+echo
+echo "But the option also is attempted to be given to bail out"
+echo "of the running of command at each stage, and get one's"
+echo "own choice of commands to run."
+echo
+echo "Most of this script:"
+echo "$0"
+echo "is about running filtering commands with Tshark, such as:"
+echo "tshark -r $dump.$ext -Y \"\$the_filter\""
+echo
+echo "Examples of entries: \"http.cookie\","
+echo "\"frame.number==NNN\" where NNN is a number, \"ssl\", \"ssl.resumed\","
+echo " \"tcp.analysis.flags\", \"tcp.analysis.rto\"."
+echo 
+echo "Many other filters should work too. But not all, such as, at this time,"
+echo "not the multiple ipv4 or ipv6 selection filters). Read 'man tshark'"
+echo "and run:"
+echo " tshark -G fields "
+echo "and you'll want to learn about filters."
+echo
+echo "The script first looks for hardwired file, in your run it is" 
+echo "${dump}_FILTER.ls-1"
+echo
+echo "Then you are offered to give the filename of the list of filters" 
+echo
+echo "Lastly, you can input filters one by one." 
+echo
+echo "First the tshark command with the filter iteration is run, second,"
+echo "you are given the option to save it to a file,"
+echo "which will have the filter string infixed in its name, in another run."
+echo
+echo "Just hit Enter"
+echo "when asked whether to run or not some filtering command,"
+echo "because the default, in such queries, is to run it."
+echo
+echo "But if you don't want to run a particular command offered"
+echo "You need to type anything starting with \"n\" or \"N\""
+echo "Nein, No, Ne, Nada, nein, no, ne, nada ... or just n or N"
+echo "when asked."
+echo
+echo -n "Hit Enter to accept or \"n\" or \"N\" to decline the filtering on: "
+echo "${dump}.$ext"
+decline
+echo
+if [ -e "${dump}_FILTER.ls-1" ]; then
+	# The hardwired name for the filter file is used promptly:
+	filter_file=${dump}_FILTER.ls-1
 	echo
+	echo "Will try to use $filter_file."
 	echo
-	echo "As long as you want to run tshark with filtering like"
-	echo "tshark -r $dump.$ext -Y \"\$the_filter\" ?"
-	echo "give value \"1\" when asked."
-	echo -n "Type \"1\" for do filtering, \"0\" for none: "
-	read do_filtering
-	echo
-	echo "Examples of entries: \"http.cookie\","
-	echo "\"frame.number==NNN\" where NNN is a number, \"ssl\", \"ssl.resumed\","
-	echo " \"tcp.analysis.flags\", \"tcp.analysis.rto\" or many other"
-	echo "filters should work too. Read 'man tshark' and run:"
-	echo " tshark -G fields "
-	echo "and you'll want to learn about filters."
-	echo
-	echo "First the tshark command with that filter is run, second, you are"
-	echo "given the option to save it to a file,"
-	echo "which will have the filter infixed in its name, in another run."
-	echo
-	if [ -e "${dump}_FILTER.ls-1" ]; then
-		# The hardwired name for the filter file is used promptly:
-		filter_file=${dump}_FILTER.ls-1
+else
+	echo "If you have prepared a file with one filter string per line"
+	echo "to run on:"
+	echo "$dump.$ext"
+	echo "type/paste here that filename, if it is in the current dir,"
+	# no ~ expansion; how do you do that?
+	echo "or type/paste here the full path (no ~ expansion) if it is not."
+	echo -n "(It must be readable by user "; echo -n $(whoami); echo -n "): "
+	read filter_file
+fi
+while [ "$?" == "0" ] ; do
+	if [ ! -e "$filter_file" ]; then
 		echo
-		echo "Will try to use $filter_file."
+		echo "There's no such file by the name that you gave, Tuxian!"
 		echo
-	else
-		echo "If you have prepared a file with one filter string per line"
-		echo "to run on:"
-		echo "$dump.$ext"
-		echo "type/paste here that filename, if it is in the current dir,"
-		# no ~ expansion; how do you do that?
-		echo "or type/paste here the full path (no ~ expansion) if it is not."
-		echo -n "(It must be readable by user "; echo -n $(whoami); echo -n "): "
-		read filter_file
+		break
 	fi
-	while [ "$do_filtering" == "1" ] ; do
-		if [ ! -e "$filter_file" ]; then
-			echo
-			echo "There's no such file by the name that you gave, tuxian!"
-			echo
-			break
-		fi
-		for the_filter in $(cat $filter_file); do
+	for the_filter in $(cat $filter_file); do
+		echo
+		echo "\$the_filter: \"$the_filter\""
+		echo " ^^^^^^^^^^^"
+		echo
+		echo "and the command interactively programmed to run next is:"
+		echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
+			$dump.$ext -V -Y \"$the_filter\"" \
+			| sed 's/\t/ /g' | sed 's/  / /g' | sed 's/  / /g' \
+			| sed 's/  / /g'
+		# Remove these two lines if you're editing this to run non-interactively
+		echo "Hit Enter"
+		read FAKE
+		tshark -o "ssl.keylog_file: $KEYLOGFILE" -r \
+			$dump.$ext -V -Y "$the_filter" \
+			| sed 's/\t/ /g' | sed 's/  / /g' | sed 's/  / /g' \
+			| sed 's/  / /g'
+		echo "You now want to save that stdout"
+		echo " to file:  ${dump}_${the_filter}.txt"
+		echo "Was there no output (or tshark complaining"
+		echo "it wasn't a field or protocol name)? Reply \"n\"!"
+		ask
+		if [ "$?" == 0 ]; then
 			echo
 			echo "\$the_filter: \"$the_filter\""
 			echo " ^^^^^^^^^^^"
 			echo
-			echo "and the command interactively programmed to run next is:"
 			echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
-				$dump.$ext -V -Y \"$the_filter\""
-			# Remove these two lines if you're editing this to run non-interactively
-			echo "Hit Enter"
-			read FAKE
-			tshark -o "ssl.keylog_file: $KEYLOGFILE" -r \
-				$dump.$ext -V -Y "$the_filter" \
-				| sed 's/\t/ /g' | sed 's/  / /g' | sed 's/  / /g' \
-				| sed 's/  / /g'
-			echo "You now want to save that stdout"
-			echo " to file:  ${dump}_${the_filter}.txt"
-			echo "Was there no output (or tshark complaining"
-			echo "it wasn't a field or protocol name)? Reply \"n\"!"
-			ask
-			if [ "$?" == 0 ]; then
-				echo
-				echo "\$the_filter: \"$the_filter\""
-				echo " ^^^^^^^^^^^"
-				echo
-				echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
-					$dump.$ext -V -Y \"$the_filter\" \
-					> ${dump}_${the_filter}.txt" | sed 's/\t/ /g' | sed 's/  / /g' \
-					| sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog
-				#tshark -o "ssl.keylog_file: $KEYLOGFILE" -r \
-				#	$dump.$ext -V -Y "$the_filter" \
-				#	> "${dump}_${the_filter}.txt"
-				# Another no go. Can't do the above when filter-infixed filename
-				# has funny name (e.g."ipv6.addr==fe80::f129:4b99:3b9f:7b55", i.e. with
-				# double ":", and there are bound to other).
-				# Can do the below. In 4 places in this script.
-				echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
-					$dump.$ext -V -Y \"$the_filter\" \
-					> ${dump}_${the_filter}.txt" | sed 's/\t/ /g' | sed 's/  / /g' \
-					| sed 's/  / /g' | sed 's/  / /g' > CMD
-				chmod 755 CMD ; ./CMD
-				echo
-				echo "More patience might be needed again..."
-				echo "I (currently) don't know how to exit the while loop below."
-				echo
-				echo "Gentle user, if you are stuck at this point with staying"
-				echo "inside this loop below because the file keeps at size 0,"
-				echo "pls. issue (in another terminal)"
-				echo "this command to get out of it: "
-				echo
-				echo "echo \" \" > ${dump}_${the_filter}.txt"
-				echo
-				echo "if the command: "
-				tail -1 $tHostsConvLog | sed 's/\t//g' | sed 's/  / /' | \
-					sed 's/  / /' | sed 's/  / /'
-				echo "has completed!"
-				echo
-				while [ ! -s "${dump}_${the_filter}.txt" ] ; do
-					sleep 5; echo -n "+5s "
-				done
-				ls -l "${dump}_${the_filter}.txt" |& tee -a $tHostsConvLog
-				echo |& tee -a $tHostsConvLog
-				echo
-				echo "---"
-				echo
-			fi
-		done
-		break
+				$dump.$ext -V -Y \"$the_filter\" \
+				> ${dump}_${the_filter}.txt" | sed 's/\t/ /g' | sed 's/  / /g' \
+				| sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog
+			#tshark -o "ssl.keylog_file: $KEYLOGFILE" -r \
+			#	$dump.$ext -V -Y "$the_filter" \
+			#	> "${dump}_${the_filter}.txt"
+			# Another no go. Can't do the above when filter-infixed filename
+			# has funny name (e.g."ipv6.addr==fe80::f129:4b99:3b9f:7b55", i.e. with
+			# double ":", and there are bound to other).
+			# Can do the below. In 4 places in this script.
+			echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
+				$dump.$ext -V -Y \"$the_filter\" \
+				> ${dump}_${the_filter}.txt" | sed 's/\t/ /g' | sed 's/  / /g' \
+				| sed 's/  / /g' | sed 's/  / /g' > CMD
+			chmod 755 CMD ; ./CMD
+			echo
+			echo "More patience might be needed again..."
+			echo "I (currently) don't know how to exit the while loop below."
+			echo
+			echo "Gentle user, if you are stuck at this point with staying"
+			echo "inside this loop below because the file keeps at size 0,"
+			echo "pls. issue (in another terminal)"
+			echo "this command to get out of it: "
+			echo
+			echo "echo \" \" > ${dump}_${the_filter}.txt"
+			echo
+			echo "if the command: "
+			tail -1 $tHostsConvLog | sed 's/\t//g' | sed 's/  / /' | \
+				sed 's/  / /' | sed 's/  / /'
+			echo "has completed!"
+			echo
+			while [ ! -s "${dump}_${the_filter}.txt" ] ; do
+				sleep 5; echo -n "+5s "
+			done
+			ls -l "${dump}_${the_filter}.txt" |& tee -a $tHostsConvLog
+			echo |& tee -a $tHostsConvLog
+			echo
+			echo "---"
+			echo
+		fi
 	done
-	echo
-	echo "If you want tshark to run more filters"
-	echo "one by one, give value \"1\" now"
-	echo "else, give \"0\" for no more filtering on:"
-	echo "${dump}.$ext"
-	echo -n "which is being processed at this stage: "
-	read do_filtering
-	while [ "$do_filtering" == "1" ]; do
+	break
+done
+echo
+echo -n "Hit Enter to accept or \"n\" or \"N\" to decline the filtering on: "
+echo "${dump}.$ext"
+decline
+if [ "$?" == 0 ]; then
+	while [ "$?" == "0" ]; do
 		echo
 		echo "Give the filter string to run on"
 		echo -n "$dump.$ext : "
@@ -432,9 +476,11 @@ fi
 			echo "---"
 			echo
 		fi
-		echo -n "Type \"1\" for do filtering, \"0\" for none: "
-		read do_filtering
+		echo -n "Hit Enter to accept or \"n\" or \"N\" to decline the filtering on: "
+		echo "${dump}.$ext"
+		decline
 	done
+fi
 
 #echo \$dump.conv-ip: $dump.conv-ip
 #read FAKE
@@ -610,12 +656,9 @@ if [ "$?" == 0 ]; then
 				ls -l ${new_dump}-frame-http-request-full_uri.txt >> $tHostsConvLog
 				echo |& tee -a $tHostsConvLog
 			fi
-			echo "If you want tshark to run more filters"
-			echo "one by one, give value \"1\" now"
-			echo "else, give \"0\" for no more filtering on:"
+			echo -n "Hit Enter to accept or \"n\" or \"N\" to decline the filtering on: "
 			echo "${new_dump}.$ext"
-			echo -n "which is being processed at this stage: "
-			read do_filtering
+			decline
 			if [ -e "${dump}_FILTER.ls-1" ]; then
 				# The hardwired name for the filter file is used promptly: 
 				filter_file=${new_dump}_FILTER.ls-1
@@ -632,10 +675,10 @@ if [ "$?" == 0 ]; then
 				echo -n "(It must be readable by user "; echo -n $(whoami); echo -n "): "
 				read filter_file
 			fi
-			while [ "$do_filtering" == "1" ]; do
+			while [ "$?" == "0" ]; do
 				if [ ! -e "$filter_file" ]; then
 					echo
-					echo "There's no such file by the name that you gave, tuxian!"
+					echo "There's no such file by the name that you gave, Tuxian!"
 					echo
 					break
 				fi
@@ -708,13 +751,10 @@ if [ "$?" == 0 ]; then
 				done
 				break
 			done
-			echo "If you want tshark to run more filters"
-			echo "one by one, give value \"1\" now"
-			echo "else, give \"0\" for no more filtering on:"
+			echo -n "Hit Enter to accept or \"n\" or \"N\" to decline the filtering on: "
 			echo "${new_dump}.$ext"
-			echo -n "which is being processed at this stage: "
-			read do_filtering
-			while [ "$do_filtering" == "1" ]; do
+			decline
+			while [ "$?" == "0" ]; do
 				echo "Give filter (see above in the script"
 				echo "for tips) to run on"
 				echo -n "$new_dump.$ext : "
@@ -727,6 +767,7 @@ if [ "$?" == 0 ]; then
 				echo " to file: ${new_dump}_${the_filter}.txt"
 				ask
 				if [ "$?" == 0 ]; then
+					echo "\$?: $? ";
 					echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
 						$new_dump.$ext -V -Y \"$the_filter\" \
 						> ${new_dump}_${the_filter}.txt" | sed 's/\t/ /g' | sed 's/  / /g' \
@@ -749,12 +790,13 @@ if [ "$?" == 0 ]; then
 					echo "---"
 					echo
 				fi
-				echo "Type \"1\" for more filtering"
-				echo "or \"0\" for no more filtering on:"
-				echo "${new_dump}.$ext"
-				echo -n "which is being processed at this stage: "
-				read do_filtering
 				echo "---"
+				echo -n "Hit Enter to accept or \"n\" or \"N\" to decline the filtering on: "
+				echo "${new_dump}.$ext"
+				decline
+				if [ "$?" == 1 ]; then
+					break
+				fi
 			done
 		fi
 	done
