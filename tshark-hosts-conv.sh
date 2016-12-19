@@ -157,7 +157,7 @@ echo "and you might find it useful for further analysis/discussion/other later."
 function ask()	# this function borrowed from "Advanced BASH Scripting Guide"
 				# (a free book) by Mendel Cooper
 {
-    echo -n "$@" '[y/n] ' ; read ans
+    echo -n "$@" '[y/[n]] ' ; read ans
     case "$ans" in
         y*|Y*) return 0 ;;
         *) return 1 ;;
@@ -166,7 +166,7 @@ function ask()	# this function borrowed from "Advanced BASH Scripting Guide"
 
 function decline()	# the opposite, reverse, the negative if you will, of ask()
 {
-    echo -n "$@" '[y/n] ' ; read ans
+    echo -n "$@" '[[y]/n] ' ; read ans
     case "$ans" in
         n*|N*) return 1 ;;
         *) return 0 ;;
@@ -307,19 +307,19 @@ echo
 echo "Most of this script:"
 echo "$0"
 echo "is about running filtering commands with Tshark, such as:"
-echo "tshark -r $dump.$ext -Y \"\$the_filter\""
+echo "tshark -r $dump.$ext -V -Y \"\$the_filter\""
 echo
 echo "Examples of entries: \"http.cookie\","
 echo "\"frame.number==NNN\" where NNN is a number, \"ssl\", \"ssl.resumed\","
 echo " \"tcp.analysis.flags\", \"tcp.analysis.rto\"."
 echo 
 echo "Many other filters should work too. But not all, such as, at this time,"
-echo "not the multiple ipv4 or ipv6 selection filters). Read 'man tshark'"
+echo "not the multiple ipv4 or ipv6 selection filters. Read 'man tshark'"
 echo "and run:"
 echo " tshark -G fields "
 echo "and you'll want to learn about filters."
 echo
-echo "The script first looks for hardwired file, in your run it is" 
+echo "The script first looks for hardwired filename, in your run it is" 
 echo "${dump}_FILTER.ls-1"
 echo
 echo "Then you are offered to give the filename of the list of filters" 
@@ -334,8 +334,8 @@ echo "Just hit Enter"
 echo "when asked whether to run or not some filtering command,"
 echo "because the default, in such queries, is to run it."
 echo
-echo "But if you don't want to run a particular command offered"
-echo "You need to type anything starting with \"n\" or \"N\""
+echo "But if you don't want to run a particular command offered,"
+echo "you need to type anything starting with \"n\" or \"N\""
 echo "Nein, No, Ne, Nada, nein, no, ne, nada ... or just n or N"
 echo "when asked."
 echo
