@@ -20,8 +20,8 @@ function show_help {
   echo -e "    \tthe sessions in the PCAP. If those have been logged in the file"
   echo -e "    \tdesignated by the \$SSLKEYLOGFILE environment variable (currently"
   echo -e "    \thard-wired to value: /home/<you>/.sslkey.log) used during"
-  echo -e "    \tFirefox or some other NSS supporting browser's run, all properly set,"
-  echo -e "    \tthen you don't need to set this flag"
+  echo -e "    \tPalemoon, Firefox, or some other NSS supporting browser's run, all"
+  echo -e "    \tproperly set, then you don't need to set this flag"
 }
 
 if [ $# -eq 0 ]; then
@@ -85,18 +85,16 @@ filename=$dump.$ext
 #raw=$1
 #i=$(echo $raw|sed 's/\.pcap//')	#obviously, if the ext of your PCAP not
 									# '.pcap', modify
-#The below would need to be further revised, as I updated since. will probably
-# be dropped, w/o frame numbers it's not so useful...
-#This line sorts the uri's alphabetically, if you uncomment two lines
-#  1 + prolongation
-#tshark -o "ssl.keylog_file: $2" -q -r $i.pcap -T fields \
-#	-e 'http.request.full_uri' | sort -u > ${i}-http-request-full_uri.txt
 #This line only greps for lines with founds -- no alpha after numbers and
 # space, not grep'ed in. Good for looking up that frame number in Wireshark
 #if [ -e "$2" ]; then
 #read FAKE
 #echo $2
 # I'm duplicating the below as I currently don't know better.
+echo tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -q -r $dump.$ext -T fields \
+	-e \'frame.number\' -e \'http.request.full_uri\' \| grep \
+	-E \'^[0-9]\{1,9\}[[:space:]][[:alpha:]]\' \
+	\> ${dump}-frame-http-request-full_uri.txt
 tshark -o "ssl.keylog_file: $KEYLOGFILE" -q -r $dump.$ext -T fields \
 	-e 'frame.number' -e 'http.request.full_uri' | grep \
 	-E '^[0-9]{1,9}[[:space:]][[:alpha:]]' \

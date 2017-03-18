@@ -50,7 +50,7 @@
 
 function show_help {
   echo "tshark-hosts-conv.sh - analyze network traces with Tshark and Bash"
-  echo "version 0.98"
+  echo "version 0.98.1"
   echo "Usage: $0 -r <PCAP file> -k <ssl.keylog_file>"
   echo ""
   echo -e "    -r \$PCAP_FILE is mandatory (but may not do it alone); see below"
@@ -226,13 +226,13 @@ fi
 # Often it's logins and passwords that are of interest in traces, and typically
 # they live in POST'ed data. So this is the next thing I'll do.
 sleep 4 && echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r $dump.$ext -V -Y \
-	'http.request.method==POST'" | sed 's/\t//g' | sed 's/  / /g' \
-	| sed 's/  / /g' | sed 's/  / /g' \
-	> $dump.POST |& tee -a $tHostsConvLog &
+	'http.request.method==POST'" \| sed \'s/\\t//g\' \| sed \'s/  / /g\' \
+	\| sed \'s/  / /g\' \| sed \'s/  / /g\' \
+	\> $dump.POST |& tee -a $tHostsConvLog &
 sleep 5 && tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -V -Y \
-	'http.request.method==POST' | sed 's/\t//g' | sed 's/  / /g' \
+	'http.request.method==POST' > $dump.POST \
 	| sed 's/  / /g' | sed 's/  / /g' \
-	> $dump.POST && ls -l $dump.POST |& tee -a $tHostsConvLog \
+	| sed 's/\t//g' | sed 's/  / /g' && ls -l $dump.POST |& tee -a $tHostsConvLog \
 	&& echo |& tee -a $tHostsConvLog &
 sleep 5 && echo "-Y http.request.method==POST started in background..." &
 sleep 5 && echo &
@@ -287,8 +287,8 @@ else
 	echo "tshark-http-uri.sh -k $KEYLOGFILE -r $dump.$ext"  \
 		| sed 's/\t/ /g' | sed 's/  / /g' \
 		| sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog
-	tshark-http-uri.sh -k $KEYLOGFILE -r $dump.$ext
-	ls -l ${dump}-frame-http-request-full_uri.txt >> $tHostsConvLog
+	tshark-http-uri.sh -k $KEYLOGFILE -r $dump.$ext |& tee -a $tHostsConvLog
+	#ls -l ${dump}-frame-http-request-full_uri.txt >> $tHostsConvLog
 	echo |& tee -a $tHostsConvLog
 fi
 echo
