@@ -107,9 +107,23 @@ fi
 dump=$(echo $PCAP_FILE|cut -d. -f1)
 #echo \$dump: $dump
 ext=$(echo $PCAP_FILE|cut -d. -f2)
+
+# Files can have a few dots, this is how I'll take the last as separator.
+num_dots=$(echo $PCAP_FILE|sed 's/\./\n/g'| wc -l)
+num_dots_min_1=$(echo $num_dots - 1 | bc)
+#echo \$num_dots: $num_dots
+#echo \$num_dots_min_1: $num_dots_min_1
+ext=$(echo $PCAP_FILE|cut -d. -f $num_dots)
 #echo \$ext: $ext
 #read FAKE
-#echo \$ext: $ext
+echo $PCAP_FILE|sed "s/\(.*\)\.$ext/\1/"
+dump=$(echo $PCAP_FILE|sed "s/\(.*\)\.$ext/\1/")
+echo \$dump: $dump
+echo \$ext: $ext
+#read FAKE
+filename=$dump.$ext
+echo \$filename: $filename
+read FAKE
 
 if [ ! -e "$dump.$ext" ]; then
 	echo "The file you gave:"
@@ -226,9 +240,9 @@ fi
 # Often it's logins and passwords that are of interest in traces, and typically
 # they live in POST'ed data. So this is the next thing I'll do.
 sleep 4 && echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r $dump.$ext -V -Y \
-	'http.request.method==POST'" \| sed \'s/\\t//g\' \| sed \'s/  / /g\' \
-	\| sed \'s/  / /g\' \| sed \'s/  / /g\' \
-	\> $dump.POST |& tee -a $tHostsConvLog &
+	'http.request.method==POST'" \> $dump.POST | sed 's/\t//g' | sed 's/  / /g' \
+	| sed 's/  / /g' | sed 's/  / /g' \
+	|& tee -a $tHostsConvLog &
 sleep 5 && tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -V -Y \
 	'http.request.method==POST' > $dump.POST \
 	| sed 's/  / /g' | sed 's/  / /g' \
