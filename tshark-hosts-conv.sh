@@ -158,7 +158,7 @@ echo "terminal such as with a command: "
 echo
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 echo "                                                             "
-echo " tailf $tHostsConvLog"
+echo " tail -f $tHostsConvLog"
 echo "                                                 <<===== |   "
 echo " ^^^^^^^^^^^^^^^^^^^^^^^^^^^                <<========== |   "
 echo " |||||||||||||||||||||||||||                                 "
@@ -189,12 +189,12 @@ function decline()	# the opposite, reverse, the negative if you will, of ask()
 
 rm -f no_overwrite_hosts_conv-ip
 if [ -e "$dump.hosts" ] && [ -e "$dump.conv-ip" ]; then
-	echo "$dump.hosts"
-	echo "and"
-	echo "$dump.conv-ip"
-	echo "already exist, NOT overwrite them?" # only overwrite both, or leave alone
+	echo ls -l \$dump.hosts
+	ls -l $dump.hosts
+	echo ls -l \$dump.conv-ip
+	ls -l $dump.conv-ip
+	echo "these already exist, keep them?" # only overwrite both, or leave alone
 	                                          # both, no time
-	echo "(y/Y/YES/yes and such will not allow overwriting)"
 	ask;
 	if [ "$?" == 0 ]; then touch no_overwrite_hosts_conv-ip
 	ls -l no_overwrite_hosts_conv-ip
@@ -233,14 +233,76 @@ if [ ! -e "no_overwrite_hosts_conv-ip" ]; then
 	tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz hosts \
 		>  $dump.hosts && ls -l $dump.hosts | sed 's/\t//g' | sed 's/  / /g' \
 		| sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog \
-		&& echo |& tee -a $tHostsConvLog &
+		&& echo "(but the" |& tee -a $tHostsConvLog \
+		&& echo "$dump.hosts" |& tee -a $tHostsConvLog \
+		&& echo "needs to be reordered yet)" && echo |& tee -a $tHostsConvLog &
 	echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r $dump.$ext -qz conv,ip \
 		>  $dump.conv-ip" | sed 's/\t//g' | sed 's/  / /g' \
 		| sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog &&
 	tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz conv,ip \
 		>  $dump.conv-ip \
 		&& ls -l $dump.conv-ip |& tee -a $tHostsConvLog \
+		&& echo "(but the" |& tee -a $tHostsConvLog \
+		&& echo "$dump.conv-ip" |& tee -a $tHostsConvLog \
+		&& echo "needs to be reordered yet)" |& tee -a $tHostsConvLog \
 		&& echo |& tee -a $tHostsConvLog &
+	# This is why it needs to be reordered: It ought to be sorted numerically
+	# and not all jumbled which is not the Wireshark default. Numerically, so that
+	# visually, in a quick glance, you easily find the IP4 address you search, being
+	# all IP4 addresses in consecutive order. IP4 only, IP6 remains untouched, yet.
+	echo "If the $dump.hosts has been created and is not empty"
+	echo "then pls. hit Enter and the order in:"
+	echo "$dump.hosts"
+	echo "will be fixed to be consecutive numerical order."
+	read FAKE
+	rm -f $dump.hosts-all-jumbled;
+	mv -v $dump.hosts $dump.hosts-all-jumbled
+	rm -f $dump.hosts-1top; rm -f $dump.hosts-3btm; rm -f $dump.hosts-2body;
+	raw_lines=$(cat $dump.hosts-all-jumbled | wc -l)
+	echo \$raw_lines: $raw_lines
+	clean_lines=$(cat $dump.hosts-all-jumbled | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' | wc -l)
+	echo \$clean_lines: $clean_lines
+	raw_lines_sans_top=$(echo $raw_lines-4|bc)
+	echo \$raw_lines_sans_top: $raw_lines_sans_top
+	ip6lines=$(echo $raw_lines_sans_top-$clean_lines|bc)
+	read FAKE
+	cat $dump.hosts-all-jumbled | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -n  > $dump.hosts-2body
+	head -4 $dump.hosts-all-jumbled > $dump.hosts-1top
+	tail -$ip6lines $dump.hosts-all-jumbled > $dump.hosts-3btm
+	cat $dump.hosts-1top $dump.hosts-2body $dump.hosts-3btm > $dump.hosts
+	ls -l $dump.hosts |& tee -a $tHostsConvLog
+	# Checking:
+	echo cat \$dump.hosts-all-jumbled \| wc -l
+	cat $dump.hosts-all-jumbled | wc -l
+	echo cat \$dump.hosts \| wc -l
+	cat $dump.hosts | wc -l
+	#read FAKE
+	# This is why it needs to be reordered: It ought to be sorted by "Relative start"
+	# which is not the Wireshark default. By "Total" "Bytes" loses all relations
+	# btwn conversations.
+	echo "If the $dump.conv-ip has been created and is not empty"
+	echo "then pls. hit Enter and the order in:"
+	echo "$dump.conv-ip"
+	echo "will be fixed to be by \"Relative Start\"."
+	read FAKE
+	rm $dump.conv-ip-by-bytes;
+	mv -v $dump.conv-ip $dump.conv-ip-by-bytes
+	rm -f $dump.conv-ip-1top; rm -f $dump.conv-ip-3btm; rm -f $dump.conv-ip-2body;
+	raw_lines=$(cat $dump.conv-ip-by-bytes | wc -l)
+	echo \$raw_lines: $raw_lines
+	raw_lines_sans_btm=$(echo $raw_lines-1|bc)
+	echo \$raw_lines_sans_btm: $raw_lines_sans_btm
+	clean_lines=$(echo $raw_lines_sans_btm-5|bc)
+	echo \$clean_lines: $clean_lines
+	#read FAKE
+	for i in $(cat $dump.conv-ip-by-bytes | head -$raw_lines_sans_btm | tail -$clean_lines | awk '{ print $10 }' | sort -n); do
+		grep $i $dump.conv-ip-by-bytes >> $dump.conv-ip-2body
+	done
+	head -5 $dump.conv-ip-by-bytes > $dump.conv-ip-1top
+	tail -1 $dump.conv-ip-by-bytes > $dump.conv-ip-3btm
+	cat $dump.conv-ip-1top $dump.conv-ip-2body $dump.conv-ip-3btm > $dump.conv-ip
+	ls -l $dump.conv-ip |& tee -a $tHostsConvLog
+	#read FAKE
 	if [ -s "$dump.hosts" ]; then
 		ls -l $dump.hosts ;
 	else
@@ -252,21 +314,27 @@ if [ ! -e "no_overwrite_hosts_conv-ip" ]; then
 		echo "in another teminal, and you'll be able to learn"
 		echo "when that process will have been completed."
 	fi
+	rm -f $dump.hosts-all-jumbled;
+	rm -f $dump.hosts-1top; rm -f $dump.hosts-3btm; rm -f $dump.hosts-2body;
+	rm -f $dump.conv-ip-by-bytes;
+	rm -f $dump.conv-ip-1top; rm -f $dump.conv-ip-3btm; rm -f $dump.conv-ip-2body;
 else
 	echo "$dump.hosts"
 	echo "and"
 	echo "$dump.conv-ip"
 	echo "(likely) left from previous run:" |& tee -a $tHostsConvLog
+	# And if it needs to be reordered, please rerun, and overwrite it.
 	ls -l $dump.hosts |& tee -a $tHostsConvLog
+	# And if it needs to be reordered, please rerun, and overwrite it.
 	ls -l $dump.conv-ip |& tee -a $tHostsConvLog
 fi
 rm -f no_overwrite_hosts_conv-ip
 
 rm -f no_overwrite_POST
 if [ -e "$dump.POST" ]; then
-	echo "$dump.POST"
-	echo "already exists, NOT overwrite them?"
-	echo "(y/Y/YES/yes and such will not allow overwriting)"
+	echo ls -l \$dump.POST
+	ls -l $dump.POST
+	echo "already exists, keep it?"
 	ask;
 	if [ "$?" == 0 ]; then touch no_overwrite_POST
 	ls -l no_overwrite_POST
@@ -339,9 +407,9 @@ rm -f no_overwrite_POST
 
 rm -f no_overwrite_request-full_uri
 if [ -e "${dump}-frame-http-request-full_uri.txt" ]; then
-	echo "$dump.request-full_uri"
-	echo "already exists, NOT overwrite them?"
-	echo "(y/Y/YES/yes will not allow overwriting)"
+	echo ls -l \${dump}-frame-http-request-full_uri.txt
+	ls -l ${dump}-frame-http-request-full_uri.txt
+	echo "already exists, keep it?"
 	ask;
 	if [ "$?" == 0 ]; then touch no_overwrite_request-full_uri
 	ls -l no_overwrite_request-full_uri
@@ -560,7 +628,8 @@ if [ "$?" == 0 ]; then
 	fi
 else
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" |& tee -a $tHostsConvLog
-	echo "Any filtering skipped by user's choice." |& tee -a $tHostsConvLog
+echo "Any filtering skipped by user's choice." |& tee -a $tHostsConvLog
+echo "(filtering at this stage)" |& tee -a $tHostsConvLog
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" |& tee -a $tHostsConvLog
 echo Continuing... ; echo -n "3 " ; sleep 1 ; echo -n "2 " ; sleep 1 ;
 echo "1 " ; sleep 1
@@ -569,7 +638,7 @@ fi
 #echo \$dump.conv-ip: $dump.conv-ip
 #read FAKE
 raw_lines=$(cat $dump.conv-ip | wc -l)
-#echo \$raw_lines: $raw_lines
+echo \$raw_lines: $raw_lines
 if [ "$raw_lines" -lt "1" ]; then
 	echo
 	echo "Yes, the below is why this happens!"
@@ -592,9 +661,9 @@ clean_lines=$(echo $raw_lines_sans_btm-5|bc)
 #read FAKE
 
 cat $dump.conv-ip | head -$raw_lines_sans_btm | tail -$clean_lines \
-	| awk '{ print $1 }' > con-ip_column_1
+	| awk '{ print $1 }' > conv-ip_column_1
 cat $dump.conv-ip | head -$raw_lines_sans_btm | tail -$clean_lines \
-	| awk '{ print $3 }'  > con-ip_column_3
+	| awk '{ print $3 }'  > conv-ip_column_3
 
 # I'm not really a programmer... If you want to use this script for yourself,
 # get your own listing of local IP's and substitute them for the ones below (I
@@ -606,7 +675,7 @@ cat $dump.conv-ip | head -$raw_lines_sans_btm | tail -$clean_lines \
 
 # Good to be able to skip this for huge traces, and go straight to saving the
 # listing
-echo "List the non-local-hosts (all with which any conversations were traced)"
+echo "Print the non-local-hosts (all with which any conversations were traced)"
 echo "one per line ?"
 echo "A huge trace (and the machine not poweful)?"
 echo "(if you don't reply \"y\", you will have one loop on the trace less to go,"
@@ -614,20 +683,17 @@ echo "and later the non-local-hosts list will anyway be created)"
 ask
 if [ "$?" == 0 ]; then
 echo "---";
-echo "This is the listing of non-local IPs"
+echo "This is the printout of non-local IPs"
 echo "---";
-# the further below, commented out, would contain also OpenNIC that i use,
-# should I exempt those as well from analysis, or?:
-paste con-ip_column_1 con-ip_column_3 | grep -Ev \
+paste conv-ip_column_1 conv-ip_column_3 | grep -Ev \
 	'0\.0\.0\.0|224\.0\.0\.1|255\.255\.255\.255|127\.0\.0\.1' \
-	| sed 's/192.168.1.1\t//' | sed 's/\t192.168.1.1//' \
-	| sed 's/192.168.1.2\t//' | sed 's/\t192.168.1.2//' \
-	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//' #\
-#
-#	| sed 's/81.2.237.32\t//' | sed 's/\t81.2.237.32//' \
-#	| sed 's/81.2.237.32//' | grep -E '[[:print:]]'
+	| sed "s/192\.168\.1\..*\t//" | sed "s/\t192\.168\.1\..*//" \
+	| sed "s/192\.168\.1\..*$//" \
+	| grep -E '[[:print:]]' 
+else
+	echo "skipping some printing..."
 fi
-read FAKE
+#read FAKE
 
 echo "---";
 echo "Saving the listing of non-local IPs from the trace to:"
@@ -636,17 +702,16 @@ echo "(takes time for huge traces)"
 echo "---";
 # the below would contain also OpenNIC that i use, should I exempt those as
 # well from analysis, or?:
-paste con-ip_column_1 con-ip_column_3 | grep -Ev \
+paste conv-ip_column_1 conv-ip_column_3 | grep -Ev \
 	'0\.0\.0\.0|224\.0\.0\.1|255\.255\.255\.255|127\.0\.0\.1' \
-	| sed 's/192.168.1.1\t//' | sed 's/\t192.168.1.1//' \
-	| sed 's/192.168.1.2\t//' | sed 's/\t192.168.1.2//' \
-	| sed 's/192.168.1.4\t//' | sed 's/\t192.168.1.4//' \
+	| sed 's/192\.168\.1\..*\t//' | sed 's/\t192\.168\.1\..*//' \
+	| sed "s/192\.168\.1\..*$//" \
 	| grep -E '[[:print:]]' \
 	> $dump.non-local-hosts-ls-1 |& tee -a $tHostsConvLog
 echo
 ls -l $dump.non-local-hosts-ls-1 |& tee -a $tHostsConvLog
 echo |& tee -a $tHostsConvLog
-rm con-ip_column_1 con-ip_column_3
+rm conv-ip_column_1 conv-ip_column_3
 echo
 echo "At this stage, you can manually edit $dump.non-local-hosts-ls-1"
 echo "to add or delete some entries, if you know what you are doing."
@@ -657,7 +722,13 @@ echo "in the second run."
 echo
 echo "Second run (if you choose it) will have options on each item."
 echo
-echo "First run now..."
+echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+echo "(Optional) first part of the first run now"
+echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+echo "which can be used for first (quick) inspection..."
+echo "(This same run you can then choose to write down in the log, and"
+echo "with false duplicates discarded, and non-resolved hosts marked."
+echo "After that there's the detailed run with more options.)"
 #echo \$dump.\$ext: $dump.$ext
 read FAKE
 # To me, having the option:
@@ -668,35 +739,114 @@ read FAKE
 # some Tshark oneliner, IIUC. So I wrote this loop below.
 # Also, legend ought to be inserted every time, except for people with huge
 # monitors and speedy eye pupils.
+echo "Run a preliminary, less tweaked iteration?"
+ask;
+if [ "$?" == 0 ]; then
+	for j in $(cat $dump.non-local-hosts-ls-1); do
+		grep $j $dump.hosts
+		read FAKE
+		cat $dump.conv-ip | head -5 | tail -2
+		grep $j $dump.conv-ip
+		echo "---"
+		echo
+		read FAKE
+	done
+else
+	echo "skipping preliminary quick run (by user's choice)..."
+fi
 
-for j in $(cat $dump.non-local-hosts-ls-1); do
-	grep $j $dump.hosts
-	read FAKE
-	cat $dump.conv-ip | head -5 | tail -2
-	grep $j $dump.conv-ip
-	echo "---"
-	echo
-	read FAKE
-done
 # And those nameres.network_name both-hostname-and-IP info you can choose to
 # write out to the log. Important piece of the log, so it is delimited by (God,
 # I'm not good at all at ascii art! I'll borrow from: Jonathan Racicot's ascii
 # art lines from his GPL licensed program NetMinecraft):
 echo |& tee -a $tHostsConvLog
 echo |& tee -a $tHostsConvLog
-echo "Write the above listing of conversations by host and by IP to the log?"
-echo -n "1 for do write to the log, 0 for do not write to the log: "
-read write_host_ip_conv
-if [ "$write_host_ip_conv" == "1" ];then
+echo "In the main part of the first run, all is recorded in the logs."
+echo "Write (duplicates will be discarded, non-resolved marked such) the listing"
+echo "of conversations by host and by IP to the log?"
+ask;
+if [ "$?" == "0" ];then
 	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" >> $tHostsConvLog
 	for j in $(cat $dump.non-local-hosts-ls-1); do
-		grep $j $dump.hosts >> $tHostsConvLog
+	echo \$j: $j
+		# needs to be checked for duplicate founds
+		# as well as for empty founds
+		#grep $j $dump.hosts
+		#grep $j $dump.hosts|wc -l
+		#echo grep \$j \$dump.hosts \| awk \'{ print \$1 }\'
+		#grep $j $dump.hosts | awk '{ print $1 }'
 		#read FAKE
+		if [ "$(grep $j $dump.hosts|wc -l)" == "1" ] ;then
+			#grep $j $dump.hosts
+			grep $j $dump.hosts >> $tHostsConvLog
+			read FAKE
+		else
+			#echo "The case is:"
+			#echo grep \$j \$dump.hosts\|wc -l
+			#grep $j $dump.hosts|wc -l
+			#read FAKE
+			#echo grep \$j \$dump.hosts \| awk \'{ print \$1 }\'
+			#read FAKE
+			#grep $j $dump.hosts | awk '{ print $1 }'
+			#read FAKE
+			#echo ls -l \$dump.hosts
+			#ls -l $dump.hosts
+			#read FAKE
+			if grep $j $dump.hosts ; then
+				# Two runs to get the false founds out needed here.
+				for instance in $(grep $j $dump.hosts | awk '{ print $1 }'); do
+					echo \$instance: $instance
+					read FAKE
+					if grep $instance $dump.conv-ip ; then
+						echo grep \$instance \$dump.hosts
+						grep $instance $dump.hosts
+						# This instance left in the $dump.hosts.
+						read FAKE
+					else
+						echo "The $instance is false duplicate"
+						# (I'm really not sure if this suffices... It does if the first
+						# instance is false duplicate... More testing needed...)
+						# I'll make a temporary $dump.hosts_TEMP without such
+						# But until this while loop is done, I have to be using it... So:
+						cp -iav $dump.hosts $dump.hosts_ORIG
+						grep -v $instance $dump.hosts > $dump.hosts_TEMP
+						mv -iv $dump.hosts_TEMP $dump.hosts
+						#read FAKE
+					fi
+				done
+			else
+				echo "NOTICE-could-not-be-resolved-NOTICE" |& tee -a $tHostsConvLog
+			fi
+			if grep $j $dump.hosts ; then
+				# Two runs to get the false founds out needed here.
+				for instance in $(grep $j $dump.hosts | awk '{ print $1 }'); do
+					echo \$instance: $instance
+					read FAKE
+					if grep $instance $dump.conv-ip ; then
+						echo grep \$instance \$dump.hosts
+						grep $instance $dump.hosts
+						grep $instance $dump.hosts >> $tHostsConvLog
+						read FAKE
+					else
+						echo "The $instance is false duplicate"
+						# (I'm really not sure if this suffices... It does if the first
+						# instance is false duplicate... More testing needed...)
+						# I'll make a temporary $dump.hosts_TEMP without such
+						# But until this while loop is done, I have to be using it... So:
+						cp -iav $dump.hosts $dump.hosts_ORIG
+						grep -v $instance $dump.hosts > $dump.hosts_TEMP
+						mv -iv $dump.hosts_TEMP $dump.hosts
+						#read FAKE
+					fi
+				done
+			fi
+			mv -iv $dump.hosts_ORIG $dump.hosts
+		fi
+		
 		cat $dump.conv-ip | head -5 | tail -2 >> $tHostsConvLog
 		grep $j $dump.conv-ip >> $tHostsConvLog
 		echo "---" >> $tHostsConvLog
 		echo >> $tHostsConvLog
-		#read FAKE
 	done
 	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" >> $tHostsConvLog
 fi	
@@ -707,6 +857,7 @@ ask
 if [ "$?" == 0 ]; then
 	echo "Second run now... If you don't reply \"y\", no further"
 	echo "analysis will be performed for the particular IP."
+	echo "However, this is the last taks. Refuse and all is finished."
 	# You can simply hit Enter, script will just continue.
 	read FAKE
 	for j in $(cat $dump.non-local-hosts-ls-1); do
@@ -744,98 +895,106 @@ if [ "$?" == 0 ]; then
 			echo -n "Hit Enter to accept or \"n\" or \"N\" to decline the filtering on: "
 			echo "${new_dump}.$ext"
 			decline
-			if [ -e "${dump}_FILTER.ls-1" ]; then
-				# The hardwired name for the filter file is used promptly: 
-				filter_file=${new_dump}_FILTER.ls-1
-				echo
-				echo "Will try to use $filter_file."
-				echo
-			else
-				echo "If you have prepared a file with one filter string per line"
-				echo "to run on:"
-				echo "$new_dump.$ext"
-				echo "type/paste here that filename, if it is in the current dir,"
-				# no ~ expansion; how do you do that?
-				echo "or type/paste here the full path (no ~ expansion) if it is not."
-				echo -n "(It must be readable by user "; echo -n $(whoami); echo -n "): "
-				read filter_file
-			fi
-			while [ "$?" == "0" ]; do
-				if [ ! -e "$filter_file" ]; then
+			# I got lost here... Elsewhere mostly works... Leave this for now...
+			#if [ "$?" == 1 ]; then
+			#	break
+			#fi
+			# the above, if uncommented, would break out of, actually everything, I think...
+			# So, trying the exterior if condition below:
+			if [ "$?" == 0 ]; then
+				if [ -e "${dump}_FILTER.ls-1" ]; then
+					# The hardwired name for the filter file is used promptly: 
+					filter_file=${new_dump}_FILTER.ls-1
 					echo
-					echo "There's no such file by the name that you gave, Tuxian!"
+					echo "Will try to use $filter_file."
 					echo
-					break
+				else
+					echo "If you have prepared a file with one filter string per line"
+					echo "to run on:"
+					echo "$new_dump.$ext"
+					echo "type/paste here that filename, if it is in the current dir,"
+					# no ~ expansion; how do you do that?
+					echo "or type/paste here the full path (no ~ expansion) if it is not."
+					echo -n "(It must be readable by user "; echo -n $(whoami); echo -n "): "
+					read filter_file
 				fi
-				for the_filter in $(cat $filter_file); do
-					echo
-					echo "\$the_filter: \"$the_filter\""
-					echo " ^^^^^^^^^^^"
-					echo
-					echo "and the command interactively programmed to run next is:"
-					echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
-						$new_dump.$ext -V -Y \"$the_filter\"" \
-						| sed 's/\t/ /g' | sed 's/  / /g' | sed 's/  / /g' \
-						| sed 's/  / /g'
-					# Remove these two lines if you're editing this to run non-interactively
-					echo "Hit Enter"
-					read FAKE
-					tshark -o "ssl.keylog_file: $KEYLOGFILE" -r \
-						$new_dump.$ext -V -Y $the_filter
-					echo "You now want to save that stdout"
-					echo " to file: ${new_dump}_${the_filter}.txt"
-					echo "Was there no output (or tshark complaining"
-					echo "it wasn't a field or protocol name)? Reply \"n\"!"
-					ask
-					if [ "$?" == 0 ]; then
+				while [ "$?" == "0" ]; do
+					if [ ! -e "$filter_file" ]; then
+						echo
+						echo "There's no such file by the name that you gave, Tuxian!"
+						echo
+						break
+					fi
+					for the_filter in $(cat $filter_file); do
 						echo
 						echo "\$the_filter: \"$the_filter\""
 						echo " ^^^^^^^^^^^"
 						echo
+						echo "and the command interactively programmed to run next is:"
 						echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
-							$new_dump.$ext -V -Y \"$the_filter\" \
-							> ${new_dump}_${the_filter}.txt" | sed 's/\t/ /g' | sed 's/  / /g' \
-							| sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog
-						#tshark -o "ssl.keylog_file: $KEYLOGFILE" -r \
-						#	$new_dump.$ext -V -Y "$the_filter" | sed 's/\t/ /g' \
-						#	| sed 's/  / /g' \
-						#	| sed 's/  / /g' | sed 's/  / /g' \
-						#	> ${new_dump}_${the_filter}.txt
-						# Another no go. Can't do the above when filter-infixed filename
-						# has a funny name. Can do the below. In 4 places in the script.
-						echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
-							$new_dump.$ext -V -Y \"$the_filter\" \
-							> ${new_dump}_${the_filter}.txt" | sed 's/\t/ /g' | sed 's/  / /g' \
-							| sed 's/  / /g' | sed 's/  / /g' > CMD
-						chmod 755 CMD ; ./CMD
-						echo
-						echo "More patience might be needed again..."
-						echo "I (currently) don't know how to exit the while loop below."
-						echo
-						echo "Gentle user, if you are stuck at this point with staying"
-						echo "inside this loop below because the file keeps at size 0,"
-						echo "pls. issue (in another terminal)"
-						echo "this command to get out of it: "
-						echo
-						echo "echo \" \" > ${new_dump}_${the_filter}.txt"
-						echo
-						echo "if the command: "
-						tail -1 $tHostsConvLog | sed 's/\t//g' | sed 's/  / /' | \
-							sed 's/  / /' | sed 's/  / /'
-						echo "has completed!"
-						echo
-						while [ ! -s "${new_dump}_${the_filter}.txt" ] ; do
-							sleep 5; echo -n "+5s "
-						done
-						ls -l ${new_dump}_${the_filter}.txt |& tee -a $tHostsConvLog
-						echo |& tee -a $tHostsConvLog
-						echo
-						echo "---"
-						echo
-					fi
+							$new_dump.$ext -V -Y \"$the_filter\"" \
+							| sed 's/\t/ /g' | sed 's/  / /g' | sed 's/  / /g' \
+							| sed 's/  / /g'
+						# Remove these two lines if you're editing this to run non-interactively
+						echo "Hit Enter"
+						read FAKE
+						tshark -o "ssl.keylog_file: $KEYLOGFILE" -r \
+							$new_dump.$ext -V -Y $the_filter
+						echo "You now want to save that stdout"
+						echo " to file: ${new_dump}_${the_filter}.txt"
+						echo "Was there no output (or tshark complaining"
+						echo "it wasn't a field or protocol name)? Reply \"n\"!"
+						ask
+						if [ "$?" == 0 ]; then
+							echo
+							echo "\$the_filter: \"$the_filter\""
+							echo " ^^^^^^^^^^^"
+							echo
+							echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
+								$new_dump.$ext -V -Y \"$the_filter\" \
+								> ${new_dump}_${the_filter}.txt" | sed 's/\t/ /g' | sed 's/  / /g' \
+								| sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog
+							#tshark -o "ssl.keylog_file: $KEYLOGFILE" -r \
+							#	$new_dump.$ext -V -Y "$the_filter" | sed 's/\t/ /g' \
+							#	| sed 's/  / /g' \
+							#	| sed 's/  / /g' | sed 's/  / /g' \
+							#	> ${new_dump}_${the_filter}.txt
+							# Another no go. Can't do the above when filter-infixed filename
+							# has a funny name. Can do the below. In 4 places in the script.
+							echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r \
+								$new_dump.$ext -V -Y \"$the_filter\" \
+								> ${new_dump}_${the_filter}.txt" | sed 's/\t/ /g' | sed 's/  / /g' \
+								| sed 's/  / /g' | sed 's/  / /g' > CMD
+							chmod 755 CMD ; ./CMD
+							echo
+							echo "More patience might be needed again..."
+							echo "I (currently) don't know how to exit the while loop below."
+							echo
+							echo "Gentle user, if you are stuck at this point with staying"
+							echo "inside this loop below because the file keeps at size 0,"
+							echo "pls. issue (in another terminal)"
+							echo "this command to get out of it: "
+							echo
+							echo "echo \" \" > ${new_dump}_${the_filter}.txt"
+							echo
+							echo "if the command: "
+							tail -1 $tHostsConvLog | sed 's/\t//g' | sed 's/  / /' | \
+								sed 's/  / /' | sed 's/  / /'
+							echo "has completed!"
+							echo
+							while [ ! -s "${new_dump}_${the_filter}.txt" ] ; do
+								sleep 5; echo -n "+5s "
+							done
+							ls -l ${new_dump}_${the_filter}.txt |& tee -a $tHostsConvLog
+							echo |& tee -a $tHostsConvLog
+							echo
+							echo "---"
+							echo
+						fi
+					done
+					break
 				done
-				break
-			done
+			fi
 			echo -n "Hit Enter to accept or \"n\" or \"N\" to decline the filtering on: "
 			echo "${new_dump}.$ext"
 			decline
@@ -888,7 +1047,7 @@ if [ "$?" == 0 ]; then
 fi
 echo "We seem to have exhausted all the loops at this stage, as we are out of"
 echo "any now."
-echo "Clearly the script is unfinished at this time."
+echo "Clearly the script is still unfinished at this time."
 echo "Updated version of this script may appear in the future at:"
 echo "https://github.com/miroR/ or if not, try and see:"
 echo "if there are any news at http://www.CroatiaFidelis.hr/foss/ ."
