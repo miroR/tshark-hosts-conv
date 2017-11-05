@@ -53,13 +53,13 @@ function show_help {
   echo "Usage: $0 -r <PCAP file> -k <ssl.keylog_file>"
   echo ""
   echo "	-r \$PCAP_FILE is mandatory (but may not do it alone); see below"
-  echo "	\tfor particular uses though"
+  echo "	for particular uses though"
   echo "	-k give the filename with the CLIENT_RANDOM... lines that belong to"
-  echo "	\tthe sessions in the PCAP. If those have been logged in the file"
-  echo "	\tdesignated by the \$SSLKEYLOGFILE environment variable (currently"
-  echo "	\thard-wired to value: /home/<you>/.sslkey.log) used during"
-  echo "	\tFirefox, Pale Moon or some other NSS supporting browser's run,"
-  echo "	\tall properly set, then you don't need to set this flag"
+  echo "	the sessions in the PCAP. If those have been logged in the file"
+  echo "	designated by the \$SSLKEYLOGFILE environment variable (currently"
+  echo "	hard-wired to value: /home/<you>/.sslkey.log) used during"
+  echo "	Firefox, Pale Moon or some other NSS supporting browser's run,"
+  echo "	all properly set, then you don't need to set this flag"
 }
 
 if [ $# -eq 0 ]; then
