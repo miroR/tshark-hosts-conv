@@ -266,7 +266,9 @@ if [ ! -e "no_overwrite_hosts_conv-ip" ]; then
 	echo "$dump.hosts"
 	echo "will be fixed to be consecutive numerical order."
 	#read FAKE
-	while ( ps aux | grep $tshark_hosts_pid | grep tshark | grep -v grep ) || ( ps aux | grep $tshark_conv_ip_pid | grep tshark | grep -v grep ); do
+	# just " grep $tshark_hosts_pid " could match other non-related stuff, not
+	# allowing $0 to go on, rarely, but it happened to me
+	while ( ps aux | grep "\<$tshark_hosts_pid\>" | grep tshark | grep -v grep ); do
 	sleep 1; echo "tshark process $tshark_hosts_pid or $tshark_conv_ip_pid still running"
 	done
 	rm -f $dump.hosts-all-jumbled;
