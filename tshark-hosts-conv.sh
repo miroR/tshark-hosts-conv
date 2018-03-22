@@ -303,7 +303,7 @@ if [ ! -e "no_overwrite_hosts_conv-ip" ]; then
 	echo "$dump.conv-ip"
 	echo "will be fixed to be by \"Relative Start\"."
 	#read FAKE
-	rm $dump.conv-ip-by-bytes;
+	if [ -e "$dump.conv-ip-by-bytes" ]; then rm -v $dump.conv-ip-by-bytes ; fi
 	mv -v $dump.conv-ip $dump.conv-ip-by-bytes
 	rm -f $dump.conv-ip-1top; rm -f $dump.conv-ip-3btm; rm -f $dump.conv-ip-2body;
 	raw_lines=$(cat $dump.conv-ip-by-bytes | wc -l)
@@ -1205,6 +1205,28 @@ else
 					fi
 				done
 			fi
+		done
+	fi
+fi
+# Cleanup of empty files produced needed here.
+for i in $(ls -1); do
+	if [ ! -s "$i" ]; then
+		ls -l $i |& tee -a $tHostsConvLog
+	fi
+done
+if [ -e ".tshark-hosts-conv_non-interactive" ]; then
+	echo "Removing the empty files listed..." |& tee -a $tHostsConvLog
+	for i in $(ls -1); do
+		if [ ! -s "$i" ]; then
+			rm -v $i |& tee -a $tHostsConvLog
+		fi
+	done
+else
+	echo "Remove these empty files listed? (recommended)"
+	ask;
+	if [ "$?" == 0 ]; then
+		for i in $(ls -1); do
+			rm -v $i |& tee -a $tHostsConvLog
 		done
 	fi
 fi
