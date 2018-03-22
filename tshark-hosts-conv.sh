@@ -53,13 +53,13 @@ function show_help {
   echo "Usage: $0 -r <PCAP file> -k <ssl.keylog_file>"
   echo ""
   echo "	-r \$PCAP_FILE is mandatory (but may not do it alone); see below"
-  echo "	\tfor particular uses though"
+  echo "	for particular uses though"
   echo "	-k give the filename with the CLIENT_RANDOM... lines that belong to"
-  echo "	\tthe sessions in the PCAP. If those have been logged in the file"
-  echo "	\tdesignated by the \$SSLKEYLOGFILE environment variable (currently"
-  echo "	\thard-wired to value: /home/<you>/.sslkey.log) used during"
-  echo "	\tFirefox, Pale Moon or some other NSS supporting browser's run,"
-  echo "	\tall properly set, then you don't need to set this flag"
+  echo "	the sessions in the PCAP. If those have been logged in the file"
+  echo "	designated by the \$SSLKEYLOGFILE environment variable (currently"
+  echo "	hard-wired to value: /home/<you>/.sslkey.log) used during"
+  echo "	Firefox, Pale Moon or some other NSS supporting browser's run,"
+  echo "	all properly set, then you don't need to set this flag"
 }
 
 if [ $# -eq 0 ]; then
@@ -246,10 +246,12 @@ if [ ! -e "no_overwrite_hosts_conv-ip" ]; then
 		&& echo "$dump.hosts" |& tee -a $tHostsConvLog \
 		&& echo "needs to be reordered yet)" && echo |& tee -a $tHostsConvLog &
 		tshark_hosts_pid=$! ; echo $tshark_hosts_pid
-	echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -r $dump.$ext -qz conv,ip \
+	# if "nameres.network_name: TRUE" set in /home/$USER/.config/wireshark/preferences,
+	# it needs correcting here, else some results will be incorrect
+	echo "tshark -o \"ssl.keylog_file: $KEYLOGFILE\" -o \"nameres.network_name: FALSE\" -r $dump.$ext -qz conv,ip \
 		>  $dump.conv-ip" | sed 's/\t//g' | sed 's/  / /g' \
 		| sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog &&
-	tshark -o "ssl.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz conv,ip \
+	tshark -o "ssl.keylog_file: $KEYLOGFILE" -o "nameres.network_name: FALSE" -r $dump.$ext -qz conv,ip \
 		>  $dump.conv-ip \
 		&& ls -l $dump.conv-ip |& tee -a $tHostsConvLog \
 		&& echo "(but the" |& tee -a $tHostsConvLog \
@@ -266,7 +268,9 @@ if [ ! -e "no_overwrite_hosts_conv-ip" ]; then
 	echo "$dump.hosts"
 	echo "will be fixed to be consecutive numerical order."
 	#read FAKE
-	while ( ps aux | grep $tshark_hosts_pid | grep tshark | grep -v grep ) || ( ps aux | grep $tshark_conv_ip_pid | grep tshark | grep -v grep ); do
+	# just " grep $tshark_hosts_pid " could match other non-related stuff, not
+	# allowing $0 to go on, rarely, but it happened to me
+	while ( ps aux | grep "\<$tshark_hosts_pid\>" | grep tshark | grep -v grep ); do
 	sleep 1; echo "tshark process $tshark_hosts_pid or $tshark_conv_ip_pid still running"
 	done
 	rm -f $dump.hosts-all-jumbled;
@@ -810,8 +814,8 @@ if [ -e ".tshark-hosts-conv_non-interactive" ]; then
 	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" >> $tHostsConvLog
 	for j in $(cat $dump.non-local-hosts-ls-1); do
 	echo \$j: $j
-		# needs to be checked for duplicate founds
-		# as well as for empty founds
+		# needs to be checked for duplicate finds
+		# as well as for empty finds
 		#grep $j $dump.hosts
 		#grep $j $dump.hosts|wc -l
 		#echo grep \$j \$dump.hosts \| awk \'{ print \$1 }\'
@@ -834,7 +838,7 @@ if [ -e ".tshark-hosts-conv_non-interactive" ]; then
 			#ls -l $dump.hosts
 			#read FAKE
 			if grep $j $dump.hosts ; then
-				# Two runs to get the false founds out needed here.
+				# Two runs to get the false finds out needed here.
 				for instance in $(grep $j $dump.hosts | awk '{ print $1 }'); do
 					echo \$instance: $instance
 					#read FAKE
@@ -859,7 +863,7 @@ if [ -e ".tshark-hosts-conv_non-interactive" ]; then
 				echo "NOTICE-could-not-be-resolved-NOTICE" |& tee -a $tHostsConvLog
 			fi
 			if grep $j $dump.hosts ; then
-				# Two runs to get the false founds out needed here.
+				# Two runs to get the false finds out needed here.
 				for instance in $(grep $j $dump.hosts | awk '{ print $1 }'); do
 					echo \$instance: $instance
 					#read FAKE
@@ -899,8 +903,8 @@ else
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" >> $tHostsConvLog
 		for j in $(cat $dump.non-local-hosts-ls-1); do
 		echo \$j: $j
-			# needs to be checked for duplicate founds
-			# as well as for empty founds
+			# needs to be checked for duplicate finds
+			# as well as for empty finds
 			#grep $j $dump.hosts
 			#grep $j $dump.hosts|wc -l
 			#echo grep \$j \$dump.hosts \| awk \'{ print \$1 }\'
@@ -923,7 +927,7 @@ else
 				#ls -l $dump.hosts
 				#read FAKE
 				if grep $j $dump.hosts ; then
-					# Two runs to get the false founds out needed here.
+					# Two runs to get the false finds out needed here.
 					for instance in $(grep $j $dump.hosts | awk '{ print $1 }'); do
 						echo \$instance: $instance
 						#read FAKE
@@ -948,7 +952,7 @@ else
 					echo "NOTICE-could-not-be-resolved-NOTICE" |& tee -a $tHostsConvLog
 				fi
 				if grep $j $dump.hosts ; then
-					# Two runs to get the false founds out needed here.
+					# Two runs to get the false finds out needed here.
 					for instance in $(grep $j $dump.hosts | awk '{ print $1 }'); do
 						echo \$instance: $instance
 						#read FAKE
