@@ -56,8 +56,8 @@ function show_help {
   echo "	for particular uses though"
   echo "	-k give the filename with the CLIENT_RANDOM... lines that belong to"
   echo "	the sessions in the PCAP. If those have been logged in the file"
-  echo "	designated by the \$SSLKEYLOGFILE environment variable (currently"
-  echo "	hard-wired to value: /home/<you>/.sslkey.log) used during"
+  echo "	designated by the \$SSLKEYLOGFILE environment variable (usually"
+  echo "	set to value such as: /home/$USER/.sslkey.log) used during"
   echo "	Firefox, Pale Moon or some other NSS supporting browser's run,"
   echo "	all properly set, then you don't need to set this flag"
 }
@@ -137,19 +137,43 @@ echo
 echo "########################################################################"
 echo "#                       *       *   * *   *       *                    #"
 echo "I'm not really a programmer. I'm writing these scripts out of sheer need."
-echo "They are currently, and that state may last for longer, in a poor user's"
+echo "They have long been, and that state may last for more, in a poor user's"
 echo "debugging state. which means lots of "#read FAKE" lines that wait for me"
 echo "to keep comparing the lines in the script to what they do, while they do"
 echo "their work... Bear with me, pls.!"
 echo
-echo "Freely comment out the \"#read FAKE\" which is four lines below here, if"
-echo "after you check the script decide that you might still use it more."
+echo "Freely (un)comment (out) the \"{#}read FAKE\" which is four lines below"
+echo "here, {to}/{if after you} check the script {you feel that you wish to"
+echo "use it more}."
 echo "#                       *       *   * *   *       *                    #"
 echo "########################################################################"
 echo
 #read FAKE
 
-tHostsConvLog=tshark-hosts-conv_$(date +%y%m%d_%H%M%S).log
+# The name is hardwired by the name of the stamp in the trace (I'm not changing
+# that anymore, I don't think, not any time soon, at least), used in the few of
+# my scripts around uncenz. In this directory that $0 (this script) is run, the
+# trace is called dump_<time-stamp>_<...>.pcap where <...> is three first
+# letters of the hostname (look up the uncenz set for how the name is made).
+# So:
+#dump=$(ls -1 *.pcap|sed 's/\.pcap//') # very likely gives that same as
+                                       # 'dump=...' further above
+basename $(realpath $(pwd))
+# The below may be a safeguard... On reruns, which means more than one log, it
+# should still work.
+dump_bis=$(basename $(realpath $(pwd))|sed 's/_tHostsConv//')
+if [ "$dump" == "dump_bis" ]; then
+	dump=$dump
+else
+	dump=$dump_bis
+fi
+echo \$dump: $dump
+#read FAKE
+# Giving it a timestamp of its own so $0 can be rerun, if needed, and get a new
+# log. I originally wrote this to be capable of being rerun, but haven't been
+# rerunning for some time... Unsure if all would work, but no time to test for
+# such conditions...
+tHostsConvLog=${dump}_tHostsConv_$(date +%y%m%d_%H%M%S).log
 export tHostsConvLog
 touch $tHostsConvLog
 echo "I have created the file $tHostsConvLog, and you can open it"
@@ -1231,6 +1255,19 @@ else
 	fi
 fi
 sleep 3 # else the returning prompt gets confused by an empty echo or something
+# This listing is necessary in case there have been more runs of $0
+ls -l ${dump}_*.log # but should be only one (if there weren't, say, any
+                         # crashes during previous run)
+#read FAKE
+ls -l $tHostsConvLog     # should list the same one file as above
+if [ ! -e "../${dump}_tHostsConv.log" ]; then
+	mv -iv $tHostsConvLog ../${dump}_tHostsConv.log   # we remove the
+												# stamp off it, it's not really
+												# needed any more
+else
+	echo "Pls. solve this manually. Only one ../\${dump}_log should there be."
+	ls -l ${dump}_*.log ../${dump}_tHostsConv.log
+fi
 echo "We seem to have exhausted all the loops at this stage, as we are out of"
 echo "any now."
 echo "The script is very rough and unpolished, lots of duplicated code..."
