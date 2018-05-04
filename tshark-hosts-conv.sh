@@ -901,9 +901,9 @@ if [ -e ".tshark-hosts-conv_non-interactive" ]; then
 						# instance is false duplicate... More testing needed...)
 						# I'll make a temporary $dump.hosts_TEMP without such
 						# But until this while loop is done, I have to be using it... So:
-						cp -iav $dump.hosts $dump.hosts_ORIG
+						cp -av $dump.hosts $dump.hosts_ORIG
 						grep -v $instance $dump.hosts > $dump.hosts_TEMP
-						mv -iv $dump.hosts_TEMP $dump.hosts
+						mv -v $dump.hosts_TEMP $dump.hosts
 						#read FAKE
 					fi
 				done
@@ -926,15 +926,15 @@ if [ -e ".tshark-hosts-conv_non-interactive" ]; then
 						# instance is false duplicate... More testing needed...)
 						# I'll make a temporary $dump.hosts_TEMP without such
 						# But until this while loop is done, I have to be using it... So:
-						cp -iav $dump.hosts $dump.hosts_ORIG
+						cp -av $dump.hosts $dump.hosts_ORIG
 						grep -v $instance $dump.hosts > $dump.hosts_TEMP
-						mv -iv $dump.hosts_TEMP $dump.hosts
+						mv -v $dump.hosts_TEMP $dump.hosts
 						#read FAKE
 					fi
 				done
 			fi
 			if [ -e "$dump.hosts_ORIG" ]; then \
-				mv -iv $dump.hosts_ORIG $dump.hosts ; fi
+				mv -v $dump.hosts_ORIG $dump.hosts ; fi
 		fi
 		
 		cat $dump.conv-ip | head -5 | tail -2 >> $tHostsConvLog
@@ -991,9 +991,9 @@ else
 							# instance is false duplicate... More testing needed...)
 							# I'll make a temporary $dump.hosts_TEMP without such
 							# But until this while loop is done, I have to be using it... So:
-							cp -iav $dump.hosts $dump.hosts_ORIG
+							cp -av $dump.hosts $dump.hosts_ORIG
 							grep -v $instance $dump.hosts > $dump.hosts_TEMP
-							mv -iv $dump.hosts_TEMP $dump.hosts
+							mv -v $dump.hosts_TEMP $dump.hosts
 							#read FAKE
 						fi
 					done
@@ -1016,15 +1016,15 @@ else
 							# instance is false duplicate... More testing needed...)
 							# I'll make a temporary $dump.hosts_TEMP without such
 							# But until this while loop is done, I have to be using it... So:
-							cp -iav $dump.hosts $dump.hosts_ORIG
+							cp -av $dump.hosts $dump.hosts_ORIG
 							grep -v $instance $dump.hosts > $dump.hosts_TEMP
-							mv -iv $dump.hosts_TEMP $dump.hosts
+							mv -v $dump.hosts_TEMP $dump.hosts
 							#read FAKE
 						fi
 					done
 				fi
 				if [ -e "$dump.hosts_ORIG" ]; then \
-					mv -iv $dump.hosts_ORIG $dump.hosts ; fi
+					mv -v $dump.hosts_ORIG $dump.hosts ; fi
 			fi
 			
 			cat $dump.conv-ip | head -5 | tail -2 >> $tHostsConvLog
@@ -1312,7 +1312,7 @@ if [ -e ".tshark-hosts-conv_non-interactive" ]; then
 	ls -l $dump.hosts $dump.hosts.TMP
 	#read FAKE
 	if [ ! -s "$dump.hosts.TMP" ]; then
-		mv -iv $dump.hosts.TMP $dump.hosts
+		mv -v $dump.hosts.TMP $dump.hosts
 	else
 		rm -v $dump.hosts.TMP
 	fi
@@ -1327,12 +1327,13 @@ else
 	if [ "$?" == 0 ]; then
 		# Now first temporarily remove comments from $dump.hosts. If the
 		# content is then 0 size, remove $dump.hosts too, else remove the
-		# temporary copy
-		cat $dump.hosts | grep -v '^#' > $dump.hosts.TMP
+		# temporary copy; also necessary to remove any blanks
+		cat $dump.hosts | grep -v '^#' | sed 's/ //'| sed 's/ //' \
+			| sed  's/ //' > $dump.hosts.TMP
 		ls -l $dump.hosts $dump.hosts.TMP
 		#read FAKE
 		if [ ! -s "$dump.hosts.TMP" ]; then
-			mv -iv $dump.hosts.TMP $dump.hosts
+			mv -v $dump.hosts.TMP $dump.hosts
 		else
 			rm -v $dump.hosts.TMP
 		fi
@@ -1368,3 +1369,4 @@ echo "The script is still rough and unpolished, with duplicated code..."
 echo "Updated version of this script may appear in the future at:"
 echo "https://github.com/miroR/ or if not, try and see:"
 echo "if there are any news at https://www.CroatiaFidelis.hr/foss/ ."
+# vim: set tabstop=4 expandtab:
