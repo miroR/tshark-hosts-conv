@@ -100,6 +100,13 @@ tshark -o "ssl.keylog_file: $KEYLOGFILE" -q -r $dump.$ext -T fields \
 	-E '^[0-9]{1,9}[[:space:]][[:alpha:]]' \
 	> ${dump}-frame-http-request-full_uri.txt
 	ls -l ${dump}-frame-http-request-full_uri.txt
+tshark -o "ssl.keylog_file: $KEYLOGFILE" -q -r $dump.$ext -T fields \
+	-e 'frame.number' -e 'http.request.uri' | grep \
+	'^[0-9]{1,9}[[:space:]]{1,9}[[:print:]]' \
+	> ${dump}-frame-http-request-full_uri.txt
+	# was 2 ln above
+	#-E '^[0-9]{1,9}[[:space:]][[:alpha:]]' \
+	ls -l ${dump}-frame-http-request-uri.txt
 #else
 #tshark -q -r $i.pcap -T fields \
 #	-e 'frame.number' -e 'http.request.full_uri' | grep \
