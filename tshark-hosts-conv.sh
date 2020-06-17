@@ -607,6 +607,12 @@ else
         fi
     done
 fi
+if [ -e "$dump.hosts-worked-ls-1" ]; then
+    rm -v $dump.hosts-worked-ls-1 |& tee -a $tHostsConvLog
+fi
+if [ -e "$dump.hosts-worked-ls-1-mod" ]; then
+    rm -v $dump.hosts-worked-ls-1-mod |& tee -a $tHostsConvLog
+fi
 sleep 3 # else the returning prompt may confuse the use with an empty echo
 # This listing is necessary in case there have been more runs of ${0##/}
 ls -l ${dump}_*.log      # but should be only one (if there weren't, say, any
