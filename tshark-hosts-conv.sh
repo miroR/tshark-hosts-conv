@@ -176,151 +176,165 @@ echo "You should wait until these are listed (with 'ls -l') when done:"
 echo
 echo "$dump.hosts"
 echo "$dump.conv-ip"
-echo 
-echo 
+echo
+echo
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 echo "  Go slowly at this start, wait a few seconds, "
-echo   
+echo
 echo "     and read what I write on the screen! "
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 echo
 echo
 echo
 echo "This script has not been programmed to wait. You, the human, wait, if needed."
-echo 
-$TSHARK -o "tls.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz hosts \
-    >  $dump.hosts && ls -l $dump.hosts | sed 's/\t//g' | sed 's/  / /g' \
-    | sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog \
-    && echo "(but the" |& tee -a $tHostsConvLog \
-    && echo "$dump.hosts" |& tee -a $tHostsConvLog \
-    && echo "needs to be reordered yet)" && echo |& tee -a $tHostsConvLog &
-    tshark_hosts_pid=$! ; echo \$tshark_hosts_pid: $tshark_hosts_pid
-    #read FAKE
+echo
+if [ ! -e "$dump.hosts" ] || [ ! -s "$dump.hosts" ]; then 
+    $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz hosts \
+        >  $dump.hosts && ls -l $dump.hosts | sed 's/\t//g' | sed 's/  / /g' \
+        | sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog \
+        && echo "(but the" |& tee -a $tHostsConvLog \
+        && echo "$dump.hosts" |& tee -a $tHostsConvLog \
+        && echo "needs to be reordered yet)" && echo |& tee -a $tHostsConvLog &
+        tshark_hosts_pid=$! ; echo \$tshark_hosts_pid: $tshark_hosts_pid
+        #read FAKE
+else
+    echo "Keeping existing $dump.hosts ."
+fi
 # if "nameres.network_name: TRUE" set in /home/$USER/.config/wireshark/preferences,
 # it needs correcting here, else some results will be incorrect
-$TSHARK -o "tls.keylog_file: $KEYLOGFILE" -o "nameres.network_name: FALSE" -r $dump.$ext -qz conv,ip \
-    >  $dump.conv-ip \
-    && ls -l $dump.conv-ip |& tee -a $tHostsConvLog \
-    && echo "(but the" |& tee -a $tHostsConvLog \
-    && echo "$dump.conv-ip" |& tee -a $tHostsConvLog \
-    && echo "needs to be reordered yet)" |& tee -a $tHostsConvLog \
-    && echo |& tee -a $tHostsConvLog &
-    tshark_conv_ip_pid=$! ; echo \$tshark_conv_ip_pid: $tshark_conv_ip_pid
-    #read FAKE
-echo "$dump.hosts"
-echo "will be fixed to be in consecutive numerical order."
-#read FAKE
-# just " grep $tshark_hosts_pid " could match other non-related stuff, not
-# allowing $0 to go on, rarely, but it happened to me
-while ( ps aux | grep "\<$tshark_hosts_pid\>" | grep tshark | grep -v grep ) || \
-    ( ps aux | grep "\<$tshark_conv_ip_pid\>" | grep tshark | grep -v grep ) ; do
-sleep 1; echo "tshark process $tshark_hosts_pid or $tshark_conv_ip_pid still running"
-done
-#read FAKE
-rm -f $dump.hosts-all-jumbled;
-mv -v $dump.hosts $dump.hosts-all-jumbled
-rm -f $dump.hosts-1top; rm -f $dump.hosts-3btm; rm -f $dump.hosts-2body;
-raw_lines=$(cat $dump.hosts-all-jumbled | wc -l)
-echo \$raw_lines: $raw_lines
-clean_lines=$(cat $dump.hosts-all-jumbled | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' | wc -l)
-echo \$clean_lines: $clean_lines
-raw_lines_sans_top=$(echo $raw_lines-4|bc)
-echo \$raw_lines_sans_top: $raw_lines_sans_top
-ip6lines=$(echo $raw_lines_sans_top-$clean_lines|bc)
-#read FAKE
-cat $dump.hosts-all-jumbled | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -n  > $dump.hosts-2body
-head -4 $dump.hosts-all-jumbled > $dump.hosts-1top
-tail -$ip6lines $dump.hosts-all-jumbled > $dump.hosts-3btm
-cat $dump.hosts-1top $dump.hosts-2body $dump.hosts-3btm > $dump.hosts
-ls -l $dump.hosts |& tee -a $tHostsConvLog
-# Checking:
-echo cat \$dump.hosts-all-jumbled \| wc -l
-cat $dump.hosts-all-jumbled | wc -l
-echo cat \$dump.hosts \| wc -l
-cat $dump.hosts | wc -l
-#read FAKE
-# This is why it needs to be reordered: It ought to be sorted by "Relative start"
-# which is not the Wireshark default. By "Total" "Bytes" loses all relations
-# btwn conversations.
-echo "$dump.conv-ip"
-echo "will be fixed to be by \"Relative Start\"."
-#read FAKE
-if [ -e "$dump.conv-ip-by-bytes" ]; then rm -v $dump.conv-ip-by-bytes ; fi
-mv -v $dump.conv-ip $dump.conv-ip-by-bytes
-rm -f $dump.conv-ip-1top; rm -f $dump.conv-ip-3btm; rm -f $dump.conv-ip-2body;
-raw_lines=$(cat $dump.conv-ip-by-bytes | wc -l)
-echo \$raw_lines: $raw_lines
-raw_lines_sans_btm=$(echo $raw_lines-1|bc)
-echo \$raw_lines_sans_btm: $raw_lines_sans_btm
-clean_lines=$(echo $raw_lines_sans_btm-5|bc)
-echo \$clean_lines: $clean_lines
-#read FAKE
-for i in $(cat $dump.conv-ip-by-bytes | head -$raw_lines_sans_btm \
-    | tail -$clean_lines | awk '{ print $10 }' | sort -n); do
-    # In case of (minimal) negative start value (rare, but happens) the
-    # value needs to be escaped.
-    char1=$(echo $i| cut -c1)
-    if [ "$char1" == "-" ]; then
-        echo $i | sed "s/-\($i\)/\\-\1/"
-        i=$(echo $i | sed "s/-\($i\)/\\-\1/")
-        echo \$i: "$i"
-        i=$(echo "\\$i")
-        echo \$i: "$i"
-    fi
-    echo "grep \"$i\" $dump.conv-ip-by-bytes >> $dump.conv-ip-2body"
-    grep "$i" $dump.conv-ip-by-bytes >> $dump.conv-ip-2body
-done
-head -5 $dump.conv-ip-by-bytes > $dump.conv-ip-1top
-tail -1 $dump.conv-ip-by-bytes > $dump.conv-ip-3btm
-cat $dump.conv-ip-1top $dump.conv-ip-2body $dump.conv-ip-3btm > $dump.conv-ip
-ls -l $dump.conv-ip |& tee -a $tHostsConvLog
-#read FAKE
-# This is very approximative. It will not find  that $dump.hosts is empty
-# in small PCAPs on not too powerful machines
-sleep 2 && if [ -s "$dump.hosts" ]; then
-    ls -l $dump.hosts ;
-else
-    echo "At the time this if statement ran, these:"
-    echo "$dump.hosts and $dump.conv-ip"
-    echo "were (still) empty files."
-    echo "If this is a huge dump on not powerful machine, fire up"
-    echo "top"
-    echo "in another teminal, and you'll be able to learn"
-    echo "when that process will have been completed."
-fi
-rm -f $dump.hosts-all-jumbled;
-rm -f $dump.hosts-1top; rm -f $dump.hosts-3btm; rm -f $dump.hosts-2body;
-rm -f $dump.conv-ip-by-bytes;
-rm -f $dump.conv-ip-1top; rm -f $dump.conv-ip-3btm; rm -f $dump.conv-ip-2body;
 
-if [ ! -e "$dump.POST" ]; then
-    sleep 5 && $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -r $dump.$ext -V -Y \
-        'http.request.method==POST' > $dump.POST \
-        && ls -l $dump.POST |& tee -a $tHostsConvLog \
+# even if $dump.POST is empty, it could be from previous interrupted run, it is kept anyway and not deleted
+if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
+    $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -o "nameres.network_name: FALSE" -r $dump.$ext -qz conv,ip \
+        >  $dump.conv-ip \
+        && ls -l $dump.conv-ip |& tee -a $tHostsConvLog \
+        && echo "(but the" |& tee -a $tHostsConvLog \
+        && echo "$dump.conv-ip" |& tee -a $tHostsConvLog \
+        && echo "needs to be reordered yet)" |& tee -a $tHostsConvLog \
         && echo |& tee -a $tHostsConvLog &
-    sleep 5 && echo "... -Y http.request.method==POST started in background..." &
-    sleep 5 && echo &
-    
-    sleep 5 && \
-    if [ -s "$dump.POST" ]; then
-        ls -l $dump.POST ;
+        tshark_conv_ip_pid=$! ; echo \$tshark_conv_ip_pid: $tshark_conv_ip_pid
+        #read FAKE
+    echo "$dump.hosts"
+    echo "will be fixed to be in consecutive numerical order."
+    #read FAKE
+    # just " grep $tshark_hosts_pid " could match other non-related stuff, not
+    # allowing $0 to go on, rarely, but it happened to me
+    while ( ps aux | grep "\<$tshark_hosts_pid\>" | grep tshark | grep -v grep ) || \
+        ( ps aux | grep "\<$tshark_conv_ip_pid\>" | grep tshark | grep -v grep ) ; do
+    sleep 1; echo "tshark process $tshark_hosts_pid or $tshark_conv_ip_pid still running"
+    done
+    #read FAKE
+    rm -f $dump.hosts-all-jumbled;
+    mv -v $dump.hosts $dump.hosts-all-jumbled
+    rm -f $dump.hosts-1top; rm -f $dump.hosts-3btm; rm -f $dump.hosts-2body;
+    raw_lines=$(cat $dump.hosts-all-jumbled | wc -l)
+    echo \$raw_lines: $raw_lines
+    clean_lines=$(cat $dump.hosts-all-jumbled | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' | wc -l)
+    echo \$clean_lines: $clean_lines
+    raw_lines_sans_top=$(echo $raw_lines-4|bc)
+    echo \$raw_lines_sans_top: $raw_lines_sans_top
+    ip6lines=$(echo $raw_lines_sans_top-$clean_lines|bc)
+    #read FAKE
+    cat $dump.hosts-all-jumbled | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -n  > $dump.hosts-2body
+    head -4 $dump.hosts-all-jumbled > $dump.hosts-1top
+    tail -$ip6lines $dump.hosts-all-jumbled > $dump.hosts-3btm
+    cat $dump.hosts-1top $dump.hosts-2body $dump.hosts-3btm > $dump.hosts
+    ls -l $dump.hosts |& tee -a $tHostsConvLog
+    # Checking:
+    echo cat \$dump.hosts-all-jumbled \| wc -l
+    cat $dump.hosts-all-jumbled | wc -l
+    echo cat \$dump.hosts \| wc -l
+    cat $dump.hosts | wc -l
+    #read FAKE
+    # This is why it needs to be reordered: It ought to be sorted by "Relative start"
+    # which is not the Wireshark default. By "Total" "Bytes" loses all relations
+    # btwn conversations.
+    echo "$dump.conv-ip"
+    echo "will be fixed to be by \"Relative Start\"."
+    #read FAKE
+    if [ -e "$dump.conv-ip-by-bytes" ]; then rm -v $dump.conv-ip-by-bytes ; fi
+    mv -v $dump.conv-ip $dump.conv-ip-by-bytes
+    rm -f $dump.conv-ip-1top; rm -f $dump.conv-ip-3btm; rm -f $dump.conv-ip-2body;
+    raw_lines=$(cat $dump.conv-ip-by-bytes | wc -l)
+    echo \$raw_lines: $raw_lines
+    raw_lines_sans_btm=$(echo $raw_lines-1|bc)
+    echo \$raw_lines_sans_btm: $raw_lines_sans_btm
+    clean_lines=$(echo $raw_lines_sans_btm-5|bc)
+    echo \$clean_lines: $clean_lines
+    #read FAKE
+    for i in $(cat $dump.conv-ip-by-bytes | head -$raw_lines_sans_btm \
+        | tail -$clean_lines | awk '{ print $10 }' | sort -n); do
+        # In case of (minimal) negative start value (rare, but happens) the
+        # value needs to be escaped.
+        char1=$(echo $i| cut -c1)
+        if [ "$char1" == "-" ]; then
+            echo $i | sed "s/-\($i\)/\\-\1/"
+            i=$(echo $i | sed "s/-\($i\)/\\-\1/")
+            echo \$i: "$i"
+            i=$(echo "\\$i")
+            echo \$i: "$i"
+        fi
+        echo "grep \"$i\" $dump.conv-ip-by-bytes >> $dump.conv-ip-2body"
+        grep "$i" $dump.conv-ip-by-bytes >> $dump.conv-ip-2body
+    done
+    head -5 $dump.conv-ip-by-bytes > $dump.conv-ip-1top
+    tail -1 $dump.conv-ip-by-bytes > $dump.conv-ip-3btm
+    cat $dump.conv-ip-1top $dump.conv-ip-2body $dump.conv-ip-3btm > $dump.conv-ip
+    ls -l $dump.conv-ip |& tee -a $tHostsConvLog
+    #read FAKE
+    # This is very approximative. It will not find  that $dump.hosts is empty
+    # in small PCAPs on not too powerful machines
+    sleep 2 && if [ -s "$dump.hosts" ]; then
+        ls -l $dump.hosts ;
     else
-        echo "At the time this if statement ran, the:"
-        echo "$dump.POST"
-        echo "was (still) an empty file."
-        echo "If this is a huge dump on not powerful machine, you can fired up"
+        echo "At the time this if statement ran, these:"
+        echo "$dump.hosts and $dump.conv-ip"
+        echo "were (still) empty files."
+        echo "If this is a huge dump on not powerful machine, fire up"
         echo "top"
-        echo "in a teminal, to see the processes running, and know when they're done."
-        echo
-        echo "You should now wait until $dump.POST is listed done (with 'ls -l')."
+        echo "in another teminal, and you'll be able to learn"
+        echo "when that process will have been completed."
     fi
-    sleep 5 && echo &
+    rm -f $dump.hosts-all-jumbled;
+    rm -f $dump.hosts-1top; rm -f $dump.hosts-3btm; rm -f $dump.hosts-2body;
+    rm -f $dump.conv-ip-by-bytes;
+    rm -f $dump.conv-ip-1top; rm -f $dump.conv-ip-3btm; rm -f $dump.conv-ip-2body;
+
+    if [ ! -e "$dump.POST" ]; then
+        sleep 5 && $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -r $dump.$ext -V -Y \
+            'http.request.method==POST' > $dump.POST \
+            && ls -l $dump.POST |& tee -a $tHostsConvLog \
+            && echo |& tee -a $tHostsConvLog &
+        sleep 5 && echo "... -Y http.request.method==POST started in background..." &
+        sleep 5 && echo &
+
+        sleep 5 && \
+        if [ -s "$dump.POST" ]; then
+            ls -l $dump.POST ;
+        else
+            echo "At the time this if statement ran, the:"
+            echo "$dump.POST"
+            echo "was (still) an empty file."
+            echo "If this is a huge dump on not powerful machine, you can fired up"
+            echo "top"
+            echo "in a teminal, to see the processes running, and know when they're done."
+            echo
+            echo "You should now wait until $dump.POST is listed done (with 'ls -l')."
+        fi
+        sleep 5 && echo &
+    else
+        echo ls -l \$dump.POST
+        ls -l $dump.POST
+    fi
 else
-    echo ls -l \$dump.POST
-    ls -l $dump.POST
+    echo "Keeping existing $dump.conv-ip ."
 fi
 
-tshark-http-uri.sh -k $KEYLOGFILE -r $dump.$ext |& tee -a $tHostsConvLog
+if [ ! -e "${dump}-frame-http-request-full_uri.txt" ]; then
+    tshark-http-uri.sh -k $KEYLOGFILE -r $dump.$ext |& tee -a $tHostsConvLog
+else
+    echo "Keeping existing ${dump}-frame-http-request-full_uri.txt ."
+fi
 ls -l ${dump}-frame-http-request-full_uri.txt >> $tHostsConvLog
 echo |& tee -a $tHostsConvLog
 
@@ -420,30 +434,6 @@ cat $dump.hosts-worked-ls-1-mod
 echo "(cat $dump.hosts-worked-ls-1-mod)"
 echo "--=-=~=-=--"
 #read FAKE
-#echo
-#echo "First run now..."
-#> $dump.conv-ip_try
-#ls -l $dump.conv-ip_try
-#for j in $(cat $dump.hosts-worked-ls-1-mod); do
-#    ip=$(echo $j|sed 's/\(.*\)@.*/\1/')
-#    starttime=$(echo $j|sed 's/.*@\(.*\)/\1/')
-#    echo "grep $ip $dump.hosts"
-#    grep $ip $dump.hosts
-#    grep $ip $dump.hosts >> $dump.conv-ip_try
-#    #read FAKE
-#    #cat $dump.conv-ip | head -5 | tail -2
-#    echo "grep \$ip $dump.conv-ip | grep \$starttime"
-#    echo "grep $ip $dump.conv-ip | grep $starttime"
-#    grep $ip $dump.conv-ip | grep $starttime
-#    grep $ip $dump.conv-ip | grep $starttime >> $dump.conv-ip_try
-#    echo "--=-=~=-=--"
-#    #read FAKE
-#    cat $dump.conv-ip_try
-#    echo "(cat $dump.conv-ip_try)"
-#    echo "---"
-#    echo
-#    #read FAKE
-#done
 # And those nameres.network_name both-hostname-and-IP info you can choose to
 # write out to the log.
 echo |& tee -a $tHostsConvLog
@@ -551,7 +541,7 @@ for j in $(cat $dump.hosts-worked-ls-1|grep -v 192.168.1.[0-9]); do
     ls -l ${new_dump}_files |& tee -a $tHostsConvLog
     if ( rmdir ${new_dump}_files &> /dev/null ); then
         if [ ! -e "${new_dump}_files" ]; then
-            echo "empty dir ${new_dump}_files deleted" |& tee -a $tHostsConvLog 
+            echo "empty dir ${new_dump}_files deleted" |& tee -a $tHostsConvLog
         fi
     fi
     if [ -e "${new_dump}_files" ]; then
@@ -562,9 +552,9 @@ for j in $(cat $dump.hosts-worked-ls-1|grep -v 192.168.1.[0-9]); do
     fi
     # bloat, just the _files dir good to have, and the localhost
     if ( echo $new_dump.$ext | grep 127.0.0.1 ); then
-        ls -l $new_dump.$ext 
+        ls -l $new_dump.$ext
     else
-        rm -v $new_dump.$ext |& tee -a $tHostsConvLog 
+        rm -v $new_dump.$ext |& tee -a $tHostsConvLog
     fi
     echo |& tee -a $tHostsConvLog
 done
