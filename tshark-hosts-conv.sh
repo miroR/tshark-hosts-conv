@@ -46,11 +46,11 @@ do
         # This is one of those: an echo-checkup on a variable (above) and its
         # fake read (below). If uncommented, they only wait for you to hit
         # Enter to go on, or hit Ctrl-C and bail out.
-        #read FAKE
+        #read NOP
         ;;
     k)  KEYLOGFILE=$OPTARG
         echo "gives: -k $KEYLOGFILE (\$KEYLOGFILE); since \$OPTARG: $OPTARG"
-        #read FAKE
+        #read NOP
         ;;
     esac
 done
@@ -69,7 +69,7 @@ ext=$(echo $PCAP_FILE|cut -d. -f $num_dots)
 dump=$(echo $PCAP_FILE|sed "s/\(.*\)\.$ext/\1/")
 echo \$dump: $dump
 echo \$ext: $ext
-#read FAKE
+#read NOP
 filename=$dump.$ext
 echo \$filename: $filename
 
@@ -90,7 +90,7 @@ basename $(realpath $(pwd))
 dump_bis=$(basename $(realpath $(pwd))|sed 's/_tHostsConv//')
 echo \$dump: $dump
 echo \$dump_bis: $dump_bis
-#read FAKE
+#read NOP
 if [ "$dump" == "$dump_bis" ]; then
     dump=$dump
 else
@@ -117,7 +117,7 @@ else
     fi
 fi
 echo \$dump: $dump
-#read FAKE
+#read NOP
 # Giving it a timestamp of its own so ${0##/} can be rerun, if needed, and get
 # a new log.
 tHostsConvLog=${dump}_tHostsConv_${ts}.log
@@ -196,7 +196,7 @@ if [ ! -e "$dump.hosts" ] || [ ! -s "$dump.hosts" ]; then
         && echo "$dump.hosts" |& tee -a $tHostsConvLog \
         && echo "needs to be reordered yet)" && echo |& tee -a $tHostsConvLog &
         tshark_hosts_pid=$! ; echo \$tshark_hosts_pid: $tshark_hosts_pid
-        #read FAKE
+        #read NOP
 else
     echo "Keeping existing $dump.hosts ."
 fi
@@ -213,17 +213,17 @@ if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
         && echo "needs to be reordered yet)" |& tee -a $tHostsConvLog \
         && echo |& tee -a $tHostsConvLog &
         tshark_conv_ip_pid=$! ; echo \$tshark_conv_ip_pid: $tshark_conv_ip_pid
-        #read FAKE
+        #read NOP
     echo "$dump.hosts"
     echo "will be fixed to be in consecutive numerical order."
-    #read FAKE
+    #read NOP
     # just " grep $tshark_hosts_pid " could match other non-related stuff, not
     # allowing $0 to go on, rarely, but it happened to me
     while ( ps aux | grep "\<$tshark_hosts_pid\>" | grep tshark | grep -v grep ) || \
         ( ps aux | grep "\<$tshark_conv_ip_pid\>" | grep tshark | grep -v grep ) ; do
     sleep 1; echo "tshark process $tshark_hosts_pid or $tshark_conv_ip_pid still running"
     done
-    #read FAKE
+    #read NOP
     rm -f $dump.hosts-all-jumbled;
     mv -v $dump.hosts $dump.hosts-all-jumbled
     rm -f $dump.hosts-1top; rm -f $dump.hosts-3btm; rm -f $dump.hosts-2body;
@@ -234,7 +234,7 @@ if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
     raw_lines_sans_top=$(echo $raw_lines-4|bc)
     echo \$raw_lines_sans_top: $raw_lines_sans_top
     ip6lines=$(echo $raw_lines_sans_top-$clean_lines|bc)
-    #read FAKE
+    #read NOP
     cat $dump.hosts-all-jumbled | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -n  > $dump.hosts-2body
     head -4 $dump.hosts-all-jumbled > $dump.hosts-1top
     tail -$ip6lines $dump.hosts-all-jumbled > $dump.hosts-3btm
@@ -245,13 +245,13 @@ if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
     cat $dump.hosts-all-jumbled | wc -l
     echo cat \$dump.hosts \| wc -l
     cat $dump.hosts | wc -l
-    #read FAKE
+    #read NOP
     # This is why it needs to be reordered: It ought to be sorted by "Relative start"
     # which is not the Wireshark default. By "Total" "Bytes" loses all relations
     # btwn conversations.
     echo "$dump.conv-ip"
     echo "will be fixed to be by \"Relative Start\"."
-    #read FAKE
+    #read NOP
     if [ -e "$dump.conv-ip-by-bytes" ]; then rm -v $dump.conv-ip-by-bytes ; fi
     mv -v $dump.conv-ip $dump.conv-ip-by-bytes
     rm -f $dump.conv-ip-1top; rm -f $dump.conv-ip-3btm; rm -f $dump.conv-ip-2body;
@@ -261,7 +261,14 @@ if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
     echo \$raw_lines_sans_btm: $raw_lines_sans_btm
     clean_lines=$(echo $raw_lines_sans_btm-5|bc)
     echo \$clean_lines: $clean_lines
-    #read FAKE
+    #read NOP
+    # With Wireshark 4.0.2 tshark prints with interpolated space btwn number
+    # and bytes,kB,MB. Reverting to no-space.
+    mv -iv $dump.conv-ip-by-bytes $dump.conv-ip-by-bytes_RAW
+    cat $dump.conv-ip-by-bytes_RAW | sed 's/\([0-9]\) bytes/\1bytes/g' \
+        | sed 's/\([0-9]\) kB/\1kB/g' | sed 's/\([0-9]\) MB/\1MB/g' \
+        > $dump.conv-ip-by-bytes
+    rm -v $dump.conv-ip-by-bytes_RAW
     for i in $(cat $dump.conv-ip-by-bytes | head -$raw_lines_sans_btm \
         | tail -$clean_lines | awk '{ print $10 }' | sort -n); do
         # In case of (minimal) negative start value (rare, but happens) the
@@ -281,7 +288,7 @@ if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
     tail -1 $dump.conv-ip-by-bytes > $dump.conv-ip-3btm
     cat $dump.conv-ip-1top $dump.conv-ip-2body $dump.conv-ip-3btm > $dump.conv-ip
     ls -l $dump.conv-ip |& tee -a $tHostsConvLog
-    #read FAKE
+    #read NOP
     # This is very approximative. It will not find  that $dump.hosts is empty
     # in small PCAPs on not too powerful machines
     sleep 2 && if [ -s "$dump.hosts" ]; then
@@ -348,12 +355,12 @@ if [ "$raw_lines" -lt "1" ]; then
     echo "and then hit Enter ? Yes! Those run in the background... (faster)"
     echo
     echo "Then, pls. just try not to hit Enter too quickly"
-    echo "(just one time at start only --if some readme FAKEs not commented out) ?"
+    echo "(just one time at start only --if some read NOPs not commented out) ?"
     echo
     echo "\$raw_lines can't be less then 1"
     exit 1
 fi
-#read FAKE
+#read NOP
 
 raw_lines_sans_btm=$(echo $raw_lines-1|bc)
 clean_lines=$(echo $raw_lines_sans_btm-5|bc)
@@ -367,7 +374,7 @@ cat $dump.conv-ip | head -$raw_lines_sans_btm | tail -$clean_lines \
 # eliminate double entries for the combined hosts/conv-ip listing
 cat $dump.conv-ip | head -$raw_lines_sans_btm | tail -$clean_lines \
     | awk '{ print $10 }'  > conv-ip_column_A
-#read FAKE
+#read NOP
 
 echo "---";
 echo "This is the listing of hosts-[to-be-]worked IPs"
@@ -380,7 +387,7 @@ paste conv-ip_column_1 conv-ip_column_3 \
     | sed "s/192\.168\.1\...+$//" \
     | sed 's/\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/' \
     | grep -E '[[:print:]]'
-#read FAKE
+#read NOP
 
 echo "---";
 echo "Saving the listing of hosts-[to-be-]worked IPs from the trace to:"
@@ -394,7 +401,7 @@ paste conv-ip_column_1 conv-ip_column_3 \
     | sed 's/\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/' \
     | grep -E '[[:print:]]' \
     > $dump.hosts-worked-ls-1 |& tee -a $tHostsConvLog
-#read FAKE
+#read NOP
 echo
 ls -l $dump.hosts-worked-ls-1 |& tee -a $tHostsConvLog
 echo |& tee -a $tHostsConvLog
@@ -404,11 +411,11 @@ if [ ! -e ".non-interactive" ]; then
     echo "At this stage, you can manually edit $dump.hosts-worked-ls-1"
     echo "to add or delete some entries, if you know what you are doing."
     echo "(Hit Enter to move on.)"
-    #read FAKE
+    #read NOP
 fi
 # $dump.hosts-worked-ls-1 needs to be sed'ed now.
 echo "making "." mean "\." for grep, next"
-#read FAKE
+#read NOP
 sed 's/\./\\\./g' $dump.hosts-worked-ls-1 > $dump.hosts-worked-ls-1-mod
 cat $dump.hosts-worked-ls-1-mod
 echo "(cat $dump.hosts-worked-ls-1-mod)"
@@ -419,21 +426,21 @@ paste $dump.hosts-worked-ls-1 conv-ip_column_A|sed 's/\t/@/' \
     > $dump.hosts-worked-ls-1-tmp
 echo "mv -v $dump.hosts-worked-ls-1-tmp $dump.hosts-worked-ls-1"
 mv -v $dump.hosts-worked-ls-1-tmp $dump.hosts-worked-ls-1
-#read FAKE
+#read NOP
 cat $dump.hosts-worked-ls-1
 echo "(cat $dump.hosts-worked-ls-1)"
 echo "--=-=~=-=--"
-#read FAKE
+#read NOP
 paste $dump.hosts-worked-ls-1-mod conv-ip_column_A|sed 's/\t/@/' \
     > $dump.hosts-worked-ls-1-mod-tmp
 echo "mv -v $dump.hosts-worked-ls-1-mod-tmp $dump.hosts-worked-ls-1-mod"
 mv -v $dump.hosts-worked-ls-1-mod-tmp $dump.hosts-worked-ls-1-mod
 rm conv-ip_column_A
-#read FAKE
+#read NOP
 cat $dump.hosts-worked-ls-1-mod
 echo "(cat $dump.hosts-worked-ls-1-mod)"
 echo "--=-=~=-=--"
-#read FAKE
+#read NOP
 # And those nameres.network_name both-hostname-and-IP info you can choose to
 # write out to the log.
 echo |& tee -a $tHostsConvLog
@@ -454,13 +461,13 @@ for j in $(cat $dump.hosts-worked-ls-1); do
     if ( grep $ip $dump.hosts ); then
         grep $ip $dump.hosts >> $dump.conv-ip_l
         grep $ip $dump.hosts >> $tHostsConvLog
-        #read FAKE
+        #read NOP
     else
         echo "$ip   NOTICE-could-not-be-resolved-NOTICE" |& tee -a $dump.conv-ip_l
         echo "$ip   NOTICE-could-not-be-resolved-NOTICE" |& tee -a $tHostsConvLog
     fi
     grep $ip $dump.conv-ip | grep $starttime
-    #read FAKE
+    #read NOP
     cat $dump.conv-ip | head -5 | tail -2 >> $dump.conv-ip_l
     cat $dump.conv-ip | head -5 | tail -2 >> $tHostsConvLog
     grep $ip $dump.conv-ip | grep $starttime >> $dump.conv-ip_l
