@@ -2,10 +2,14 @@
 #
 # an script to do some basic analysis of PCAPs with Tshark
 #
-# Copyright (C) 2015 Miroslav Rovis, <http://www.CroatiaFidelis.hr/>
+# Copyright (C) 2015,2023 Miroslav Rovis, <https://www.CroatiaFidelis.hr/>
 # Use this at your own risk!
 # released under BSD license, see LICENSE, or assume general BSD license,
 #
+
+# it is necessary to have a configuration file such as:
+. /home/$USER/.tshark_hosts_conv.conf
+# pcap_size_limit and opennic need to be set in it
 
 . shark2use
 
@@ -31,7 +35,7 @@ fi
 #
 # Reset in case getopts has been used previously in the shell.
 #
-OPTIND=1    # I still don't understand the OPTIND, nor if it is needed here.
+OPTIND=1
 KEYLOGFILE=""
 
 while getopts "h?r:k:" opt;
@@ -55,8 +59,6 @@ do
     esac
 done
 
-ts=$(date +%s)
-
 if [ "$KEYLOGFILE" == "" ]; then
     KEYLOGFILE=$SSLKEYLOGFILE
 fi
@@ -70,15 +72,12 @@ dump=$(echo $PCAP_FILE|sed "s/\(.*\)\.$ext/\1/")
 echo \$dump: $dump
 echo \$ext: $ext
 #read NOP
-filename=$dump.$ext
-echo \$filename: $filename
 
 # if $dump and $ext are empty, you get "." which exists!, adding -f condition
 if [ ! -e "$dump.$ext" ] || [ ! -f "$dump.$ext" ]; then
     echo "The file you gave:"
     echo "$dump.$ext"
     echo "does not exist, or is not in the current directory"
-    echo "(unless it's the current dir :-) )."
     sleep 3
     show_help
     exit 0
@@ -94,8 +93,8 @@ echo \$dump_bis: $dump_bis
 if [ "$dump" == "$dump_bis" ]; then
     dump=$dump
 else
-    # I've been using this script from pre-mkdir'ed ${dump}_tHostsConv, only.
-    # This is accomodation such use.
+    # I've been using this script from pre-mkdir'ed ${dump}_tHostsConv.
+    # This is accomodation for such use.
     echo "Dear user, you're supposed to be in ${dump}_tHostsConv dir,"
     echo "    and you're _not_ , apparently, see:"
     echo \$dump_bis: $dump_bis
@@ -120,8 +119,16 @@ echo \$dump: $dump
 #read NOP
 # Giving it a timestamp of its own so ${0##/} can be rerun, if needed, and get
 # a new log.
-tHostsConvLog=${dump}_tHostsConv_${ts}.log
+ts=$(date +%s)
+tHostsConvLog=${dump}_tHostsConv_${ts}.log  # currently to log into
+tHostsConvLogR=${dump}_tHostsConv.log       # for grep'ing, not to re-process
+                                            #+ lines that get nothing or which
+                                            #+ have been done in previous run
 export tHostsConvLog
+export tHostsConvLogR
+echo \$tHostsConvLogR: $tHostsConvLogR
+ls -l ../$tHostsConvLogR
+#read NOP
 touch $tHostsConvLog
 echo "I have created the file $tHostsConvLog, and you can open it"
 echo "in another terminal such as with a command: "
@@ -136,11 +143,12 @@ echo "                                                             "
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 sleep 3
 echo
-echo "and you might find it useful for further analysis/discussion/other later."
+echo "It is needed for re-runs."
+echo "You may also find it useful for further analysis/other later."
 echo "# Commands as used by the script, written out for educational purposes." \
      |& tee -a $tHostsConvLog
 
-function ask()    # this function borrowed from "Advanced BASH Scripting Guide"
+function ask()    # this function taken from "Advanced BASH Scripting Guide"
                   # (a free book) by Mendel Cooper
 {
     echo -n "$@" '[y/[n]] ' ; read ans
@@ -166,20 +174,28 @@ if [ ! -e ".non-interactive" ]; then
     fi
 fi
 
+ls -lL --time-style=posix-long-iso $dump.$ext
+echo "(ls -lL --time-style=posix-long-iso $dump.$ext)"
+ls -lL --time-style=posix-long-iso $dump.$ext | awk '{print $5}'
+echo "(ls -lL --time-style=posix-long-iso $dump.$ext | awk '{print $5}')"
+#read NOP
+pcap_size=$(ls -lL --time-style=posix-long-iso $dump.$ext | awk '{print $5}')
+echo \$pcap_size: $pcap_size
+#read NOP
 # The list of hosts, and the conversations is what this script extracts first
-echo "tshark ... $dump.$ext -qz hosts started in background..."
-echo "tshark ... $dump.$ext -qz conv,ip started in background..."
+echo "$TSHARK ... $dump.$ext -qz hosts may have started in background..."
+echo "$TSHARK ... $dump.$ext -qz conv,ip may have started in background..."
 echo
 echo
 echo
-echo "You should wait until these are listed (with 'ls -l') when done:"
+echo "If so, you should wait until these are listed (with 'ls -l') when done:"
 echo
 echo "$dump.hosts"
 echo "$dump.conv-ip"
 echo
 echo
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-echo "  Go slowly at this start, wait a few seconds, "
+echo "  And go slowly at this start, wait a few seconds, "
 echo
 echo "     and read what I write on the screen! "
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -189,7 +205,7 @@ echo
 echo "This script has not been programmed to wait. You, the human, wait, if needed."
 echo
 if [ ! -e "$dump.hosts" ] || [ ! -s "$dump.hosts" ]; then 
-    $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -r $dump.$ext -qz hosts \
+    $TSHARK -otls.keylog_file:$KEYLOGFILE -r $dump.$ext -qz hosts \
         >  $dump.hosts && ls -l $dump.hosts | sed 's/\t//g' | sed 's/  / /g' \
         | sed 's/  / /g' | sed 's/  / /g' |& tee -a $tHostsConvLog \
         && echo "(but the" |& tee -a $tHostsConvLog \
@@ -203,9 +219,22 @@ fi
 # if "nameres.network_name: TRUE" set in /home/$USER/.config/wireshark/preferences,
 # it needs correcting here, else some results will be incorrect
 
-# even if $dump.POST is empty, it could be from previous interrupted run, it is kept anyway and not deleted
-if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
-    $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -o "nameres.network_name: FALSE" -r $dump.$ext -qz conv,ip \
+# even if $dump.POST is empty, it could be from previous interrupted run, it is
+# kept anyway and not deleted
+if [ ! -e "$dump.conv-ip" ]; then
+    echo \$pcap_size: $pcap_size
+    echo \$pcap_size_limit: $pcap_size_limit
+    echo \$pcap_size_limit_do_anyway: $pcap_size_limit_do_anyway
+    #read NOP
+    if [ "$pcap_size" -gt "$pcap_size_limit" ] && [ "$pcap_size_limit_do_anyway" != "y" ]; then
+        while ( ps aux | grep "\<$tshark_hosts_pid\>" | grep tshark | grep -v grep ); do
+            sleep 1; echo "delaying till tshark process $tshark_hosts_pid is done, as $dump.$ext large"
+        done
+    else
+        echo "\$pcap_size gt \$pcap_size_limit and \$pcap_size_limit_do_anyway condition not met"
+    fi
+    #read NOP
+    $TSHARK -otls.keylog_file:$KEYLOGFILE -onameres.network_name:FALSE -r $dump.$ext -qz conv,ip \
         >  $dump.conv-ip \
         && ls -l $dump.conv-ip |& tee -a $tHostsConvLog \
         && echo "(but the" |& tee -a $tHostsConvLog \
@@ -215,13 +244,13 @@ if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
         tshark_conv_ip_pid=$! ; echo \$tshark_conv_ip_pid: $tshark_conv_ip_pid
         #read NOP
     echo "$dump.hosts"
-    echo "will be fixed to be in consecutive numerical order."
+    echo "will be fixed to be sorted by 'Relative start'."
     #read NOP
     # just " grep $tshark_hosts_pid " could match other non-related stuff, not
     # allowing $0 to go on, rarely, but it happened to me
     while ( ps aux | grep "\<$tshark_hosts_pid\>" | grep tshark | grep -v grep ) || \
         ( ps aux | grep "\<$tshark_conv_ip_pid\>" | grep tshark | grep -v grep ) ; do
-    sleep 1; echo "tshark process $tshark_hosts_pid or $tshark_conv_ip_pid still running"
+    sleep 2; echo "tshark process $tshark_hosts_pid or $tshark_conv_ip_pid still running"
     done
     #read NOP
     rm -f $dump.hosts-all-jumbled;
@@ -236,7 +265,7 @@ if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
     ip6lines=$(echo $raw_lines_sans_top-$clean_lines|bc)
     #read NOP
     cat $dump.hosts-all-jumbled | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -n  > $dump.hosts-2body
-    head -4 $dump.hosts-all-jumbled > $dump.hosts-1top
+    head -n4 $dump.hosts-all-jumbled > $dump.hosts-1top
     tail -$ip6lines $dump.hosts-all-jumbled > $dump.hosts-3btm
     cat $dump.hosts-1top $dump.hosts-2body $dump.hosts-3btm > $dump.hosts
     ls -l $dump.hosts |& tee -a $tHostsConvLog
@@ -284,12 +313,12 @@ if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
         echo "grep \"$i\" $dump.conv-ip-by-bytes >> $dump.conv-ip-2body"
         grep "$i" $dump.conv-ip-by-bytes >> $dump.conv-ip-2body
     done
-    head -5 $dump.conv-ip-by-bytes > $dump.conv-ip-1top
-    tail -1 $dump.conv-ip-by-bytes > $dump.conv-ip-3btm
+    head -n5 $dump.conv-ip-by-bytes > $dump.conv-ip-1top
+    tail -n1 $dump.conv-ip-by-bytes > $dump.conv-ip-3btm
     cat $dump.conv-ip-1top $dump.conv-ip-2body $dump.conv-ip-3btm > $dump.conv-ip
     ls -l $dump.conv-ip |& tee -a $tHostsConvLog
     #read NOP
-    # This is very approximative. It will not find  that $dump.hosts is empty
+    # This is very approximative. It will not find that $dump.hosts is empty
     # in small PCAPs on not too powerful machines
     sleep 2 && if [ -s "$dump.hosts" ]; then
         ls -l $dump.hosts ;
@@ -306,47 +335,97 @@ if [ ! -e "$dump.conv-ip" ] && [ ! -e "$dump.POST" ]; then
     rm -f $dump.hosts-1top; rm -f $dump.hosts-3btm; rm -f $dump.hosts-2body;
     rm -f $dump.conv-ip-by-bytes;
     rm -f $dump.conv-ip-1top; rm -f $dump.conv-ip-3btm; rm -f $dump.conv-ip-2body;
-
-    if [ ! -e "$dump.POST" ]; then
-        sleep 5 && $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -r $dump.$ext -V -Y \
-            'http.request.method==POST' > $dump.POST \
-            && ls -l $dump.POST |& tee -a $tHostsConvLog \
-            && echo |& tee -a $tHostsConvLog &
-        sleep 5 && echo "... -Y http.request.method==POST started in background..." &
-        sleep 5 && echo &
-
-        sleep 5 && \
-        if [ -s "$dump.POST" ]; then
-            ls -l $dump.POST ;
-        else
-            echo "At the time this if statement ran, the:"
-            echo "$dump.POST"
-            echo "was (still) an empty file."
-            echo "If this is a huge dump on not powerful machine, you can fired up"
-            echo "top"
-            echo "in a teminal, to see the processes running, and know when they're done."
-            echo
-            echo "You should now wait until $dump.POST is listed done (with 'ls -l')."
-        fi
-        sleep 5 && echo &
-    else
-        echo ls -l \$dump.POST
-        ls -l $dump.POST
-    fi
 else
     echo "Keeping existing $dump.conv-ip ."
 fi
 
-if [ ! -e "${dump}-frame-http-request-full_uri.txt" ]; then
-    tshark-http-uri.sh -k $KEYLOGFILE -r $dump.$ext |& tee -a $tHostsConvLog
+if [ ! -e "$dump.POST" ]; then
+    if [ "$pcap_size" -gt "$pcap_size_limit" ] && [ "$pcap_size_limit_do_anyway" != "y" ]; then
+        while ( ps aux | grep "\<$tshark_conv_ip_pid\>" | grep tshark | grep -v grep ); do
+            sleep 1; echo "delaying till tshark process $tshark_conv_ip_pid is done, as $dump.$ext large"
+        done
+    else
+        echo "\$pcap_size gt \$pcap_size_limit and \$pcap_size_limit_do_anyway condition not met"
+    fi
+    sleep 5 && $TSHARK -otls.keylog_file:$KEYLOGFILE -r $dump.$ext -V -Y \
+        'http.request.method==POST' > $dump.POST &
+    tshark_post_pid=$! ; echo \$tshark_post_pid: $tshark_post_pid
+    sleep 5 && echo "... -Y http.request.method==POST started in background..." &
+    if [ "$pcap_size" -gt "$pcap_size_limit" ] && [ "$pcap_size_limit_do_anyway" != "y" ]; then
+        while ( ps aux | grep "\<$tshark_post_pid\>" | grep tshark | grep -v grep ); do
+            sleep 2; echo "delaying till tshark process $tshark_post_pid is done, as $dump.$ext large"
+        done
+    else
+        echo "\$pcap_size gt \$pcap_size_limit and \$pcap_size_limit_do_anyway condition not met"
+    fi
+    ls -l $dump.POST |& tee -a $tHostsConvLog \
+    && echo |& tee -a $tHostsConvLog &
+    sleep 5 && echo &
+
+    sleep 5 && \
+    if [ -s "$dump.POST" ]; then
+        ls -l $dump.POST ;
+    else
+        echo "At the time this if statement ran, the:"
+        echo "$dump.POST"
+        echo "was (still) an empty file."
+        echo "If this is a huge dump on not powerful machine, you can fired up"
+        echo "top"
+        echo "in a teminal, to see the processes running, and know when they're done."
+        echo
+        echo "You should now wait until $dump.POST is listed done (with 'ls -l')."
+    fi
+    sleep 5 && echo &
 else
-    echo "Keeping existing ${dump}-frame-http-request-full_uri.txt ."
+    echo ls -l \$dump.POST
+    ls -l $dump.POST
 fi
-ls -l ${dump}-frame-http-request-full_uri.txt >> $tHostsConvLog
-echo |& tee -a $tHostsConvLog
+ls -l ../$tHostsConvLogR
+#read NOP
+if [ -e "../$tHostsConvLogR" ] && [ -s "../$tHostsConvLogR" ]; then
+    grep ${dump}-frame-http-request-full_uri.txt ../$tHostsConvLogR
+    echo "(grep ${dump}-frame-http-request-full_uri.txt)" ../$tHostsConvLogR
+    dump_http_full_uri=''
+    if ( grep -q ${dump}-frame-http-request-full_uri.txt ../$tHostsConvLogR ); then
+        echo "${dump}_${ip}-frame-http-request-full_uri.txt previously processed"
+        echo "setting dump_http_full_uri to 'y'"
+        dump_http_full_uri=y
+    fi
+    grep ${dump}-frame-http2-request-full_uri.txt ../$tHostsConvLogR
+    echo "(grep ${dump}-frame-http2-request-full_uri.txt)" ../$tHostsConvLogR
+    dump_http2_full_uri=''
+    if ( grep -q ${dump}-frame-http2-request-full_uri.txt ../$tHostsConvLogR ); then
+        echo "${dump}_${ip}-frame-http2-request-full_uri.txt previously processed"
+        echo "setting dump_http2_full_uri to 'y'"
+        dump_http2_full_uri=y
+    fi
+fi
+echo \$dump_http_full_uri: $dump_http_full_uri
+echo \$dump_http2_full_uri: $dump_http2_full_uri
+#read NOP
+if [ ! -e "${dump}-frame-http-request-full_uri.txt" ] && [ ! -e "${dump}-frame-http2-request-full_uri.txt" ]; then
+    if [ "$dump_http_full_uri" != "y" ] || [ "$dump_http2_full_uri" != "y" ]; then
+        echo "tshark-httpX-uri.sh -k $KEYLOGFILE -r $dump.$ext" |& tee -a $tHostsConvLog
+        #read NOP
+        tshark-httpX-uri.sh -k $KEYLOGFILE -r $dump.$ext |& tee -a $tHostsConvLog
+        if [ -e "${dump}-frame-http-request-full_uri.txt" ]; then
+            ls -l ${dump}-frame-http-request-full_uri.txt >> $tHostsConvLog
+            echo |& tee -a $tHostsConvLog
+        fi
+        if [ -e "${dump}-frame-http2-request-full_uri.txt" ]; then
+            ls -l ${dump}-frame-http2-request-full_uri.txt >> $tHostsConvLog
+            echo |& tee -a $tHostsConvLog
+        fi
+    else
+        echo "Not re-processing some of ${dump}-frame-http{,2}-request-full_uri.txt"
+        echo "             (not doing since would be empty)."
+    fi
+else
+    echo "Keeping existing ${dump}-frame-http{,2}-request-full_uri.txt."
+fi
 
 raw_lines=$(cat $dump.conv-ip | wc -l)
-#echo \$raw_lines: $raw_lines
+echo \$raw_lines: $raw_lines
 if [ "$raw_lines" -lt "1" ]; then
     echo
     echo "Yes, the below is why this happens!"
@@ -458,20 +537,20 @@ for j in $(cat $dump.hosts-worked-ls-1); do
     echo \$starttime: $starttime
     # needs to be checked for duplicate finds
     # as well as for empty finds
-    if ( grep $ip $dump.hosts ); then
-        grep $ip $dump.hosts >> $dump.conv-ip_l
-        grep $ip $dump.hosts >> $tHostsConvLog
+    if ( grep "\<$ip\>" $dump.hosts ); then
+        grep "\<$ip\>" $dump.hosts >> $dump.conv-ip_l
+        grep "\<$ip\>" $dump.hosts >> $tHostsConvLog
         #read NOP
     else
-        echo "$ip   NOTICE-could-not-be-resolved-NOTICE" |& tee -a $dump.conv-ip_l
-        echo "$ip   NOTICE-could-not-be-resolved-NOTICE" |& tee -a $tHostsConvLog
+        echo "$ip   NOTICE-not-resolved-NOTICE" |& tee -a $dump.conv-ip_l
+        echo "$ip   NOTICE-not-resolved-NOTICE" |& tee -a $tHostsConvLog
     fi
-    grep $ip $dump.conv-ip | grep $starttime
+    grep "\<$ip\>" $dump.conv-ip | grep $starttime
     #read NOP
-    cat $dump.conv-ip | head -5 | tail -2 >> $dump.conv-ip_l
-    cat $dump.conv-ip | head -5 | tail -2 >> $tHostsConvLog
-    grep $ip $dump.conv-ip | grep $starttime >> $dump.conv-ip_l
-    grep $ip $dump.conv-ip | grep $starttime >> $tHostsConvLog
+    cat $dump.conv-ip | head -n5 | tail -n2 >> $dump.conv-ip_l
+    cat $dump.conv-ip | head -n5 | tail -n2 >> $tHostsConvLog
+    grep "\<$ip\>" $dump.conv-ip | grep $starttime >> $dump.conv-ip_l
+    grep "\<$ip\>" $dump.conv-ip | grep $starttime >> $tHostsConvLog
     echo "---" >> $dump.conv-ip_l
     echo "---" >> $tHostsConvLog
     echo >> $tHostsConvLog
@@ -488,83 +567,123 @@ if ( diff ../$dump.conv-ip_l ../$dump.conv-ip_l_${ts} ); then
 fi
 echo |& tee -a $tHostsConvLog
 echo |& tee -a $tHostsConvLog
-for j in $(cat $dump.hosts-worked-ls-1|grep -v 192.168.1.[0-9]); do
-    echo \$j: $j
-    ip=$(echo $j|sed 's/\(.*\)@.*/\1/')
-    echo \$ip: $ip
-    grep $ip $dump.hosts
-    cat $dump.conv-ip | head -5 | tail -2
-    grep $ip $dump.conv-ip
-    echo "The IP: $ip"
-    tshark-http-uri.sh -k $KEYLOGFILE -r $dump.$ext -i $ip
-    ls -l ${dump}-frame-http-request-full_uri.txt |& tee -a $tHostsConvLog
-    echo |& tee -a $tHostsConvLog
+# It is good to use OpenNIC. It can be kept in say $opennic_file
+# e.g. in /etc/resolv_conf_opennic with content such as:
+# nameserver <the IP>
+# nameserver <another IP>
+# and in  /etc/resolv_conf_opennic necessary to set a line like:
+# opennic_file=/etc/resolv_conf_opennic
+grep nameserver $opennic_file | awk '{print $2}'| tr '\12' '@' | sed 's/@\([0-9]\)/\\\|\1/' |  sed 's/@//'
+opennic=$(grep nameserver $opennic_file | awk '{print $2}'| tr '\12' '@' | sed 's/@\([0-9]\)/\\\|\1/' |  sed 's/@//')
+#debug 5 ln
+echo \$opennic: $opennic
+for j in $(cat $dump.hosts-worked-ls-1|grep -v 192.168.1.[0-9]|grep -v 255.255.255.255|grep -v "$opennic"); do
+    echo $j
 done
-for j in $(cat $dump.hosts-worked-ls-1|grep 192.168.1.[0-9]); do
-    echo \$j: $j
-    ip=$(echo $j|sed 's/\(.*\)@.*/\1/')
-    echo \$ip: $ip
-    grep $ip $dump.hosts
-    cat $dump.conv-ip | head -5 | tail -2
-    grep $ip $dump.conv-ip
-    echo "The IP: $ip"
-    $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -q -r $dump.$ext -Y "(ip.src==$ip)&&(ip.dst==$ip)" -T fields \
-        -e 'frame.number' -e 'http.request.full_uri' | grep \
-        -E '^[0-9]{1,9}[[:space:]][[:alpha:]]' \
-        > ${dump}_${ip}-frame-http-request-full_uri.txt
-    ls -l ${dump}-frame-http-request-full_uri.txt |& tee -a $tHostsConvLog
-    echo |& tee -a $tHostsConvLog
-done
-for j in $(cat $dump.hosts-worked-ls-1|grep -v 192.168.1.[0-9]); do
-    echo \$j: $j
-    ip=$(echo $j|sed 's/\(.*\)@.*/\1/')
-    echo \$ip: $ip
-    grep $ip $dump.hosts
-    cat $dump.conv-ip | head -5 | tail -2
-    grep $ip $dump.conv-ip
-    echo "The IP: $ip"
-    new_dump=${dump}_${ip}
-    $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -r $dump.$ext \
-        -Y "(ip.addr==$ip)" -w $new_dump.$ext
-    echo
-    ls -l $new_dump.$ext |& tee -a $tHostsConvLog
-    echo |& tee -a $tHostsConvLog
-    echo
-    # Keep the new method. Not use the old, except for export to _files/ dir
-    #if [ -e "${dump}_${ip}-frame-http-request-full_uri.txt" ]; then
-    #    cp -iav ${dump}_${ip}-frame-http-request-full_uri.txt \
-    #        ${dump}_${ip}-frame-http-request-full_uri.txt.new-method
-    #fi
-    #tshark-http-uri.sh -k $KEYLOGFILE -r $new_dump.$ext
-    #ls -l ${new_dump}-frame-http-request-full_uri.txt |& tee -a $tHostsConvLog
-    #echo |& tee -a $tHostsConvLog
-    #
-    # Currently tshark can extract all HTTP GET and POST payload (--export-object), but it can't
-    # run --export-object combined with filtering on convs or streams
-    # (or I haven't figured out how). So do extracting by each ip conv.
-    $TSHARK -o "tls.keylog_file: $KEYLOGFILE" -r $new_dump.$ext \
-        -q --export-object http,${new_dump}_files
-    echo "ls -l ${new_dump}_files" |& tee -a $tHostsConvLog
-    ls -l ${new_dump}_files |& tee -a $tHostsConvLog
-    if ( rmdir ${new_dump}_files &> /dev/null ); then
-        if [ ! -e "${new_dump}_files" ]; then
-            echo "empty dir ${new_dump}_files deleted" |& tee -a $tHostsConvLog
+#read NOP
+if [ "$pcap_size" -lt "$pcap_size_limit" ] || [ "$pcap_size_limit_do_anyway" == "y" ]; then
+    for j in $(cat $dump.hosts-worked-ls-1|grep -v 192.168.1.[0-9]|grep -v 255.255.255.255|grep -v "$opennic"); do
+        echo \$j: $j
+        ip=$(echo $j|sed 's/\(.*\)@.*/\1/')
+        echo \$ip: $ip
+        grep "\<$ip\>" $dump.hosts
+        cat $dump.conv-ip | head -n5 | tail -n2
+        grep "\<$ip\>" $dump.conv-ip
+        echo "The IP: $ip"
+        # grep the previously written log if exists
+        if [ -e "../$tHostsConvLogR" ] && [ -s "../$tHostsConvLogR" ]; then
+            grep ${dump}_${ip}-frame-http-request-full_uri.txt ../$tHostsConvLogR
+            echo "(grep ${dump}_${ip}-frame-http-request-full_uri.txt)" ../$tHostsConvLogR
+            dump_ip_http_full_uri=''
+            if ( grep -q ${dump}_${ip}-frame-http-request-full_uri.txt ../$tHostsConvLogR ); then
+                echo "${dump}_${ip}-frame-http-request-full_uri.txt previously processed"
+                echo "setting dump_ip_http_full_uri to 'y'"
+                dump_ip_http_full_uri=y
+            fi
+            grep ${dump}_${ip}-frame-http2-request-full_uri.txt ../$tHostsConvLogR
+            echo "(grep ${dump}_${ip}-frame-http2-request-full_uri.txt)" ../$tHostsConvLogR
+            dump_ip_http2_full_uri=''
+            if ( grep -q ${dump}_${ip}-frame-http2-request-full_uri.txt ../$tHostsConvLogR ); then
+                echo "${dump}_${ip}-frame-http2-request-full_uri.txt previously processed"
+                echo "setting dump_ip_http2_full_uri to 'y'"
+                dump_ip_http2_full_uri=y
+            fi
         fi
-    fi
-    if [ -e "${new_dump}_files" ]; then
-        if [ -e "../${new_dump}_files" ]; then
-            mv -v ../${new_dump}_files ../${new_dump}_files_${ts}
+        echo \$dump_ip_http_full_uri: $dump_ip_http_full_uri
+        echo \$dump_ip_http2_full_uri: $dump_ip_http2_full_uri
+        #read NOP
+        if [ ! -e "${dump}_${ip}-frame-http-request-full_uri.txt" ] && [ ! -e "${dump}_${ip}-frame-http2-request-full_uri.txt" ]; then
+            if [ "$dump_ip_http_full_uri" != "y" ] || [ "$dump_ip_http2_full_uri" != "y" ]; then
+                tshark-httpX-uri.sh -k $KEYLOGFILE -r $dump.$ext -i $ip
+                if [ -e "${dump}_${ip}-frame-http-request-full_uri.txt" ]; then
+                    ls -l ${dump}_${ip}-frame-http-request-full_uri.txt |& tee -a $tHostsConvLog
+                    echo |& tee -a $tHostsConvLog
+                fi
+                if [ -e "${dump}_${ip}-frame-http2-request-full_uri.txt" ]; then
+                    ls -l ${dump}_${ip}-frame-http2-request-full_uri.txt |& tee -a $tHostsConvLog
+                    echo |& tee -a $tHostsConvLog
+                fi
+            fi
         fi
-        mv -v ${new_dump}_files ../
-    fi
-    # bloat, just the _files dir good to have, and the localhost
-    if ( echo $new_dump.$ext | grep 127.0.0.1 ); then
-        ls -l $new_dump.$ext
-    else
-        rm -v $new_dump.$ext |& tee -a $tHostsConvLog
-    fi
-    echo |& tee -a $tHostsConvLog
-done
+    done
+    echo
+    for j in $(cat $dump.hosts-worked-ls-1|grep -v 192.168.1.[0-9]|grep -v 255.255.255.255|grep -v "$opennic"); do
+        echo \$j: $j
+        ip=$(echo $j|sed 's/\(.*\)@.*/\1/')
+        echo \$ip: $ip
+        grep "\<$ip\>" $dump.hosts
+        cat $dump.conv-ip | head -n5 | tail -n2
+        grep "\<$ip\>" $dump.conv-ip
+        echo "The IP: $ip"
+        #new_dump=${dump}_${ip}
+        if [ -d "../${dump}_${ip}_files" ]; then
+            dump_ip_files_cont="${dump}_${ip}_files_cont"
+            dump_ip_files_cont=$(ls -1 ../${dump}_${ip}_files)
+            echo "X${dump_ip_files_cont}X"
+        fi
+        if [ -d "../${dump}_${ip}_files" ] &&  [ "X${dump_ip_files_cont}X" != "XX" ] || \
+            ( grep "empty dir ${dump}_${ip}_files deleted" ../$tHostsConvLogR ); then
+            echo "Work on ${dump}_${ip} to extract ${dump}_${ip}_files not needed."
+        else
+            $TSHARK -otls.keylog_file:$KEYLOGFILE -r $dump.$ext \
+                -Y "(ip.addr==$ip)" -w ${dump}_${ip}.$ext
+            echo
+            ls -l ${dump}_${ip}.$ext |& tee -a $tHostsConvLog
+            echo |& tee -a $tHostsConvLog
+            echo
+            # tshark can extract all HTTP objects (--export-object), but it can't
+            # run --export-object combined with filtering on convs or streams
+            # (or I haven't figured out how). So do extracting by each ip PCAP.
+            $TSHARK -otls.keylog_file:$KEYLOGFILE -r ${dump}_${ip}.$ext \
+                -q --export-object http,${dump}_${ip}_files
+            echo "ls -l ${dump}_${ip}_files" |& tee -a $tHostsConvLog
+            ls -l ${dump}_${ip}_files |& tee -a $tHostsConvLog
+            if ( rmdir ${dump}_${ip}_files &> /dev/null ); then
+                if [ ! -e "${dump}_${ip}_files" ]; then
+                    echo "empty dir ${dump}_${ip}_files deleted" |& tee -a $tHostsConvLog
+                fi
+            fi
+            mv -v ${dump}_${ip}_files ../
+        fi
+        # bloat, just the _files dir good to have, and the localhost
+        if ( echo ${dump}_${ip}.$ext | grep 127.0.0.1 ); then
+            ls -l ${dump}_${ip}.$ext
+        else
+            rm -v ${dump}_${ip}.$ext |& tee -a $tHostsConvLog
+        fi
+        echo |& tee -a $tHostsConvLog
+    done
+else
+    echo "\$pcap_size larger then $pcap_size_limit (set in /home/$USER/.tshark_hosts_conv.conf):" |& tee -a $tHostsConvLog
+    echo "############################################################" |& tee -a $tHostsConvLog
+    echo "Generally it is better to preprocess/filter larger \$dump.\$ext before work" |& tee -a $tHostsConvLog
+    echo "I.e. we won't work this file: " |& tee -a $tHostsConvLog
+    ls -l $dump.$ext |& tee -a $tHostsConvLog
+    echo "set pcap_size_limit_do_anyway to y and run ${0##*/} on $dump.$ext again" |& tee -a $tHostsConvLog
+    echo "          if you really want to work it.              " |& tee -a $tHostsConvLog
+    echo "    (${0##*/} has skipped lots of lines in this script)              " |& tee -a $tHostsConvLog
+    echo "############################################################" |& tee -a $tHostsConvLog
+fi
 
 # Cleanup of empty files produced needed here.
 for i in $(ls -1); do
@@ -615,15 +734,16 @@ sleep 3 # else the returning prompt may confuse the use with an empty echo
 ls -l ${dump}_*.log      # but should be only one (if there weren't, say, any
                          # crashes during previous run)
 ls -l $tHostsConvLog     # should list the same one file as above
+# if exists, just append to it, temporary solution, to do all re-run grep'ing in one file
 if [ -e "../${dump}_tHostsConv.log" ]; then
-    mv -v ../${dump}_tHostsConv.log ../${dump}_tHostsConv.log_${ts}
+    #mv -v ../${dump}_tHostsConv.log ../${dump}_tHostsConv.log_${ts}
+    cat $tHostsConvLog >> ../${dump}_tHostsConv.log
+    rm -v $tHostsConvLog
+else
+    mv -v $tHostsConvLog ../${dump}_tHostsConv.log
 fi
-mv -v $tHostsConvLog ../${dump}_tHostsConv.log  # we remove the
-                                                # stamp off it, it's not really
-                                                # needed any more
 echo "We seem to have exhausted all the loops at this stage, as we are out of"
 echo "any now."
-echo "The script is still rough and unpolished, with duplicated code..."
 echo "Updated version of this script may appear in the future at:"
 echo "https://github.com/miroR/ or if not, try and see:"
 echo "if there are any news at https://www.CroatiaFidelis.hr/foss/ ."
